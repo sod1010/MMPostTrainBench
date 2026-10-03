@@ -1,0 +1,26 @@
+mmposttrainbench
+================
+
+This project is a multimodal fork of PostTrainBench.
+
+Derived work:
+  PostTrainBench — https://github.com/aisa-group/PostTrainBench
+  MIT License, Copyright (c) 2025 Ben Rank, Hardik Bhatnagar,
+  Matthias Bethge, Maksym Andriushchenko
+  (see LICENSE — retained verbatim as required by the MIT License).
+
+mmposttrainbench extends PostTrainBench from text-LLM post-training to
+multimodal (audio / image / video) post-training of Qwen3-Omni-30B-A3B across
+8 benchmarks (mmau, mmar, mmmu_pro, video_mmmu, videomme_v2, jointavbench,
+omnivideobench, mmswe), and replaces the HTCondor + apptainer run path with a
+Docker separate-verifier pipeline (runs on any GPU host; scheduler-agnostic).
+
+Multimodal extensions, the Docker orchestration (src/docker/), the omni eval
+stack (eval_omni/, src/eval/ multimodal adapters), and the harbor build-context
+adapter (src/harbor_adapter/) are:
+  Copyright (c) 2025 mmposttrainbench maintainers
+  Licensed under the MIT License (see LICENSE).
+
+Benchmark datasets are the property of their respective authors and are
+downloaded from their public HuggingFace repositories at prepare time
+(see src/docker/resources.json); they are not redistributed by this repository.

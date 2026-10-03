@@ -1,0 +1,77 @@
+--- a/eval/qwen3_omni_eval.py
++++ b/eval/qwen3_omni_eval.py
+@@ -40,8 +40,9 @@
+ 
+ # 设置环境变量
+ os.environ['TRANSFORMERS_OFFLINE'] = '1'
+-os.environ['CUDA_VISIBLE_DEVICES'] = '2,3'
+-# os.environ['CUDA_VISIBLE_DEVICES'] = '0'
++# 显卡由外部 env(run 脚本)控制。单卡跑 device_map=auto 可避免
++# Qwen3OmniMoe 跨卡切分导致的 "tensors on cuda:0/cuda:1" 生成报错。不再硬编码。
++# os.environ['CUDA_VISIBLE_DEVICES'] = '2,3'
+ 
+ def process_mm_info(conversations, use_audio_in_video, return_video_kwargs=False):
+     audios = process_audio_info(conversations, use_audio_in_video)
+@@ -58,7 +59,7 @@
+         torch_dtype=torch.bfloat16,
+         device_map="auto",
+         # device_map = _device_map,
+-        attn_implementation="flash_attention_2",
++        attn_implementation="sdpa",   # 本 env 未装 flash-attn;sdpa 等效可用
+         # load_in_8bit=True
+     )
+ 
+@@ -145,7 +146,7 @@
+     
+     print("start inferencing...")
+     with torch.no_grad():
+-        text_ids, audio = model.generate(
++        gen = model.generate(
+             **inputs, 
+             use_audio_in_video=use_audio_in_video,
+             max_new_tokens=1024,
+@@ -153,8 +154,15 @@
+             do_sample=True
+         )
+     
+-    del inputs
+-    return text_ids, audio
++    # Qwen3-Omni generate() returns (output, audio). output is a GenerationMixinOutput (.sequences)
++    # or a raw [B,seq] Tensor depending on the transformers build; unpack the tuple first.
++    _src = gen[0] if isinstance(gen, (tuple, list)) and len(gen) >= 1 else gen
++    if hasattr(_src, "sequences"):
++        text_ids = _src.sequences
++    else:
++        text_ids = _src
++    _audio = gen[1] if isinstance(gen, (tuple, list)) and len(gen) > 1 else None
++    return text_ids, _audio
+ 
+ 
+ 
+@@ -223,8 +231,11 @@
+         
+         # Extract and evaluate answer
+         print("decode the response...")
+-        response_text = processor.batch_decode(text_ids.sequences[:, inputs["input_ids"].shape[1] :], 
+-                                               skip_special_tokens=True, 
++        # generate_model_response already unwraps (output, audio) and returns the
++        # raw sequence ids, so slice text_ids directly -- do NOT call .sequences
++        # again (that was the bug that scored omnivideobench 0/1000 every run).
++        response_text = processor.batch_decode(text_ids[:, inputs["input_ids"].shape[1] :],
++                                               skip_special_tokens=True,
+                                                clean_up_tokenization_spaces=False)[0]
+         model_answer = extract_model_answer(response_text,prompt)
+         single_result['model_answer'] = model_answer
+@@ -255,6 +266,12 @@
+         print(f"No videos with duration < {max_duration} seconds found. Exiting evaluation.")
+         return
+     
++    # 冒烟用:env OVB_LIMIT 截断样本数(不设=全量)
++    _lim = os.environ.get("OVB_LIMIT")
++    if _lim:
++        filtered_qa_pairs = filtered_qa_pairs[: int(_lim)]
++        print(f"[OVB_LIMIT] truncated to {len(filtered_qa_pairs)} QA pairs")
++
+     # Load existing results for resume functionality
+     results, processed_ids = load_existing_results(output_file)
+     

@@ -1,0 +1,70 @@
+{
+  "_comment": "Declarative download manifest for mmposttrainbench (mirrors PostTrainBench's containers/download_hf_cache/resources.json idiom). prepare_data.sh reads this. All 8 eval benches have a PUBLIC HuggingFace origin; the internal OSS paths were only an operator-local cache. Override any repo via the env var named in <ID>_REPO (e.g. JOINTAVBENCH_REPO) to point at a mirror/fork.",
+  "model": {
+    "repo_env": "MODEL_REPO",
+    "default_repo": "Qwen/Qwen3-Omni-30B-A3B-Instruct",
+    "dest_env": "MODEL_DIR"
+  },
+  "benches": [
+    {
+      "id": "mmau",
+      "repo": "lmms-lab-audio/mmau",
+      "repo_type": "dataset",
+      "cache_glob": "*mmau*",
+      "note": "run_mmau_official.py: load_dataset(split=test_mini) reads HF_HOME hub cache"
+    },
+    {
+      "id": "mmar",
+      "repo": "ngqtrung/mmar",
+      "repo_type": "dataset",
+      "cache_glob": "*mmar*",
+      "needs_token": true,
+      "note": "run_mmar_official.py: load_dataset(split=test)"
+    },
+    {
+      "id": "mmmu_pro",
+      "repo": "MMMU/MMMU_Pro",
+      "repo_type": "dataset",
+      "cache_glob": "*MMMU_Pro*",
+      "note": "lmms-eval task mmmu_pro_standard (auto-loads from HF_HOME)"
+    },
+    {
+      "id": "video_mmmu",
+      "repo": "lmms-eval/VideoMMMU",
+      "repo_type": "dataset",
+      "cache_glob": "*VideoMMMU*",
+      "note": "lmms-eval task video_mmmu_comprehension (videos ship inside the dataset repo)"
+    },
+    {
+      "id": "videomme_v2",
+      "repo": "MME-Benchmarks/Video-MME-v2",
+      "repo_type": "dataset",
+      "cache_glob": "*ideo*MME*",
+      "post": "videomme_v2_extract",
+      "note": "lmms-eval task videomme_v2. utils.py hard-requires the 800 source .mp4 pre-extracted to HF_HOME/<cache_dir>/{video_id}.mp4 (see post-step)."
+    },
+    {
+      "id": "jointavbench",
+      "repo": "roverx12345/jointavbench",
+      "repo_type": "dataset",
+      "cache_glob": "*jointavbench*",
+      "post": "jointavbench_convert",
+      "note": "2853-row public mirror (matches our contam-ref). run_jointav_official.py wants JOINTAV_DATA=<dir>/jointavbench.json + videos/<qid>.mp4 (see post-step)."
+    },
+    {
+      "id": "omnivideobench",
+      "repo": "NJU-LINK/OmniVideoBench",
+      "repo_type": "dataset",
+      "cache_glob": "*OmniVideoBench*",
+      "post": "omnivideobench_convert",
+      "note": "official OmniVideoBench. Converted to our local layout by eval_omni/runners/convert_omnivideobench.py (see post-step)."
+    },
+    {
+      "id": "mmswe",
+      "repo": "SWE-bench/SWE-bench_Multimodal",
+      "repo_type": "dataset",
+      "cache_glob": "*swe-bench_multimodal*",
+      "note": "SWE-bench Multimodal (the code/SWE dimension; scored by REAL resolved rate, not string match). The dataset download is all prepare_data.sh does; grading additionally needs (a) a python venv with swebench==5.0.2 at $SWE_WORK/venv, (b) outbound HTTPS to a container registry + blob mirror (MMSWE_REGISTRY_API / MMSWE_BLOB_MIRROR) and to each instance's screenshot host, and (c) unshare+chroot capability in the eval container. See src/eval/tasks/mmswe/dlc_native_grade.py."
+    }
+  ]
+}

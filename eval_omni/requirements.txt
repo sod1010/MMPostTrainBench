@@ -1,0 +1,20 @@
+# Qwen3-Omni 评测环境依赖(torch/torchvision 在 Dockerfile 单独装 cu128 wheel)。
+# 精确 pin = 2026-08 逐坑验证过的可用组合。切勿升级 transformers(≥5.12 多卡 device_map 生成跨设备崩)
+# 或 datasets(≥4.0 强制 torchcodec,踩 ffmpeg ABI 地狱)。
+transformers==4.57.0
+huggingface-hub==0.36.2
+tokenizers==0.22.2
+safetensors==0.8.0
+accelerate==1.14.0
+datasets==3.6.0
+qwen-omni-utils==0.0.9
+transformers-stream-generator==0.0.5
+# 媒体处理:音频 soundfile/librosa;视频 av+decord(torchcodec 不装,缺它回退 decord)
+librosa==0.11.0
+soundfile==0.14.0
+av==15.1.0
+decord==0.6.0
+moviepy==2.2.1
+pillow==11.3.0
+numpy==1.26.4
+# 注:hf_xet / torchcodec 故意不装(见 Dockerfile 注释)

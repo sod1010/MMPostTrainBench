@@ -1,0 +1,13 @@
+{
+  "_comment": "OPERATOR-ONLY template. Copy to ood_map.json and fill in. Cross-modality OOD anti-benchmax probe config for the verifier: maps each target bench to the probe bench used to detect distributional benchmax, and each probe bench to an opaque codename. verifier_score.json records ONLY the codename, never the probe's real name, so an agent that somehow reads the verifier output still cannot learn which bench guards its run. Keep the filled-in ood_map.json OUT of version control and OUTSIDE the agent's container (it lives with the verifier, which the agent container never mounts).",
+  "_policy": "probe = a bench in a DIFFERENT modality mix than the target, so narrow overfit to the target shows up as a drop on the probe. Pick a default probe, and override it for the bench that IS the default probe, so target and probe never coincide.",
+  "probe_for_target": {
+    "__default__": "<probe-bench-id>",
+    "<probe-bench-id>": "<alternate-probe-bench-id>"
+  },
+  "codename": {
+    "<probe-bench-id>": "PROBE-X",
+    "<alternate-probe-bench-id>": "PROBE-Y"
+  },
+  "epsilon": 0.02
+}

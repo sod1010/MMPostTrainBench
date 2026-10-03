@@ -1,0 +1,53 @@
+{
+  "_comment": "Published target-test reference scores (Table 2) and split sizes (Table 7). Scores are fractions, rounded to four decimals. These metadata do not replace a frozen dataset/model manifest.",
+  "model": "Qwen3-Omni-30B-A3B-Instruct",
+  "n_full": {
+    "mmau": 1000,
+    "mmar": 1000,
+    "mmmu_pro": 1730,
+    "jointavbench": 2853,
+    "video_mmmu": 300,
+    "omnivideobench": 1000,
+    "videomme_v2": 3200,
+    "mmswe": 580
+  },
+  "scores": {
+    "mmau": 0.486,
+    "mmar": 0.724,
+    "mmmu_pro": 0.4191,
+    "jointavbench": 0.5994,
+    "video_mmmu": 0.6,
+    "videomme_v2": 0.2481,
+    "omnivideobench": 0.3961,
+    "mmswe": 0.0229
+  },
+  "schema_version": 2,
+  "score_split": "eval",
+  "source": "MMPostTrainBench preprint, Tables 2 and 7",
+  "n_dev": {
+    "mmau": 332,
+    "mmar": 332,
+    "mmmu_pro": 558,
+    "jointavbench": 905,
+    "video_mmmu": 98,
+    "omnivideobench": 332,
+    "videomme_v2": 1003,
+    "mmswe": 100
+  },
+  "n_eval": {
+    "mmau": 668,
+    "mmar": 668,
+    "mmmu_pro": 1172,
+    "jointavbench": 1948,
+    "video_mmmu": 202,
+    "omnivideobench": 668,
+    "videomme_v2": 2197,
+    "mmswe": 480
+  },
+  "dataset_splits": {
+    "mmswe": {
+      "val": "dev",
+      "eval": "test"
+    }
+  }
+}

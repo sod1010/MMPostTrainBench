@@ -1,0 +1,19 @@
+{
+  "_comment": "Public reference rates for the Research Budget & Efficiency metric. NOT internal accounting. Pinned here for reproducibility; edit to your cloud's public list price. GPU rate is per-GPU-hour for an H800/H100-class card. Token rates are per 1e6 tokens (Mtok), Anthropic public list-price tier for the Opus family; cached-input priced separately (read vs 5m-write).",
+  "gpu_usd_per_gpu_hour": 2.0,
+  "gpu_ref_card": "H800-class (public cloud on-demand ~USD 2.0/GPU-h)",
+  "models": {
+    "claude-opus-5": {
+      "input_usd_per_mtok": 15.0,
+      "output_usd_per_mtok": 75.0,
+      "cache_read_usd_per_mtok": 1.5,
+      "cache_write_usd_per_mtok": 18.75
+    },
+    "claude-opus-4-8": {
+      "input_usd_per_mtok": 15.0,
+      "output_usd_per_mtok": 75.0,
+      "cache_read_usd_per_mtok": 1.5,
+      "cache_write_usd_per_mtok": 18.75
+    }
+  }
+}

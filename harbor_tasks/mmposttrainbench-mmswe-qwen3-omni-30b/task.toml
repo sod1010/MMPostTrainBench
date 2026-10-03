@@ -1,0 +1,141 @@
+version = "1.0"
+
+[metadata]
+author_name = "mmposttrainbench maintainers"
+category = "ml-training"
+tags = ["post-training", "omni", "multimodal", "fine-tuning", "gpu"]
+
+# Agent env: post-training Qwen3-Omni-30B (MoE, A3B active) does NOT fit
+# training on a single card — the agent needs multiple GPUs for model/expert
+# parallelism or FSDP. NOTE: when driven by the docker layer (src/docker/) the
+# resource controller there sets its own GPU counts and mounts; these fields
+# apply to a harbor modal run and are kept correct for parity.
+[environment]
+gpus = 8
+gpu_types = ["H100", "H800"]
+cpus = 32
+memory_mb = 262144
+storage_mb = 204800
+build_timeout_sec = 3600.0
+allow_internet = true
+
+# Healthcheck runs after entrypoint.sh comes up and before the agent starts.
+# Two jobs:
+#   1. Verify the log-streaming daemon (tail -F /logs/agent/*) is running so
+#      the agent's output reaches Modal's dashboard live.
+#   2. Idempotently record the timer start time at /timer_start. Aligning the
+#      write with healthcheck means the timer starts essentially at agent
+#      launch, not at container boot.
+[environment.healthcheck]
+command = "pgrep -f 'tail -F' > /dev/null && (test -f /timer_start || date +%s > /timer_start)"
+interval_sec = 2
+timeout_sec = 5
+start_period_sec = 5
+start_interval_sec = 1
+retries = 3
+
+# Verifier runs in a SEPARATE container from the agent — harbor 0.7.0's
+# separate-verifier mode (PR #1655, docs:
+# https://www.harborframework.com/docs/tasks#verifier-environment-shared-vs-separate).
+# Adversarial agent can't tamper with evaluate.py, the contamination
+# judge, the Python interpreter, or any installed package the verifier
+# imports. Evaluation runs in a separate container.
+#
+# The verifier image is built from `tests/` as the build context (see
+# tests/Dockerfile). test.sh + evaluate.py + templates/ +
+# contamination_judge.py + metadata.json are baked INTO the image at
+# build time; harbor does not upload tests/ at runtime for separate envs.
+[verifier]
+timeout_sec = 43200.0
+environment_mode = "separate"
+
+[verifier.env]
+OPENAI_API_KEY = "${OPENAI_API_KEY}"
+CODEX_API_KEY = "${OPENAI_API_KEY}"
+
+# Verifier container resources. This is the mmswe (SWE-bench Multimodal)
+# bench: stage-1 generate shards the 30B omni model across cards, and
+# stage-2 grade unpacks each instance's official rootfs into /dev/shm and
+# runs its test suite (host-RAM heavy) — hence 8 GPUs + 1024Gi RAM,
+# matching what the docker orchestration layer (src/docker/) provisions.
+[verifier.environment]
+gpus = 8
+gpu_types = ["H100", "H800"]
+cpus = 64
+memory_mb = 1048576
+storage_mb = 204800
+build_timeout_sec = 3600.0
+allow_internet = true
+
+[verifier.environment.healthcheck]
+command = "pgrep -f 'tail -F' > /dev/null && (test -f /timer_start || date +%s > /timer_start)"
+interval_sec = 2
+timeout_sec = 5
+start_period_sec = 5
+start_interval_sec = 1
+retries = 3
+
+[agent]
+timeout_sec = 36000.0
+
+# Single workspace artifact. In separate-verifier mode this `source`
+# is transferred from the agent env to the verifier env at the same
+# path AND archived under <trial_dir>/artifacts/workspace/ on the host.
+#
+# One entry (was previously two — workspace + a separate final_model).
+# Rationale for collapsing:
+#   1. Two overlapping artifacts (final_model nested inside workspace)
+#      triggered harbor 0.15's UserWarning at task load and made
+#      upload order load-bearing (`upload_artifacts` calls
+#      `empty_dirs(target)` before each upload, so a later workspace
+#      upload would wipe an earlier final_model).
+#   2. Two tar ops on the agent env is two chances to hit harbor's
+#      flaky transfer path (empty stderr, code -1). One op is
+#      strictly better.
+#
+# `final_model` is NOT in the exclude list — we want the trained
+# weights carried in via this single artifact so the verifier has them
+# at /home/agent/workspace/final_model/. On the host they land at
+# artifacts/workspace/final_model/ (postmortem access, just one path
+# deeper than before).
+#
+# The contamination judge in test.sh reads the agent's code via
+# `cd $WORKSPACE && codex exec ...` — the workspace transfer supplies
+# everything under /home/agent/workspace/ minus the excludes below.
+[[artifacts]]
+source = "/home/agent/workspace"
+destination = "workspace"
+# Aggressive excludes to keep the agent-side tar tractable. The
+# 2026-05-27 and 2026-06-27 trials died with harbor's tar exit code
+# -1 / empty stderr on multi-GB workspaces containing HF cache +
+# wandb + checkpoint dirs. Drop anything the contamination judge
+# doesn't need — judge only reads the agent's source code (.py, .md,
+# .json configs, .sh), not caches/checkpoints/logs. `final_model` is
+# deliberately kept so the verifier gets the weights.
+exclude = [
+    # Standard hygiene:
+    "__pycache__",
+    "*.pyc",
+    ".git",
+    ".venv",
+    "venv",
+    # HF / transformers / datasets caches (often many GB):
+    ".cache",
+    ".huggingface",
+    # Experiment tracking:
+    "wandb",
+    ".wandb",
+    # Training output dirs commonly produced by HF Trainer / Hydra
+    # (final_model is NOT excluded — we want it transferred):
+    "checkpoint-*",
+    "runs",
+    "outputs",
+    "output",
+    "logs",
+    # Tokenized dataset shards (large, not useful for judge):
+    "*.arrow",
+    "*.parquet",
+    # Misc:
+    "tmp",
+    ".tmp",
+]

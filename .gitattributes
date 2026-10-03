@@ -1,0 +1,2 @@
+# Patch context preserves upstream whitespace for byte-exact reconstruction.
+eval_omni/patches/*.patch -whitespace

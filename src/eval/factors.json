@@ -1,0 +1,45 @@
+{
+  "_comment": "Per-benchmark aggregation factors for mmposttrainbench. Each score is already normalized to [0,1] by its evaluate.py adapter (mmar divides its %/100; videomme_v2 uses overall_score in [0,1]; mmswe uses resolved/n). 'weight' sets the contribution to the weighted-mean aggregate; default equal weight per bench. 'group' is the modality for optional per-modality reporting. Tune weights here (e.g. to balance modalities) without touching the runners.",
+  "benchmarks": {
+    "mmau": {
+      "weight": 1.0,
+      "group": "audio",
+      "higher_is_better": true
+    },
+    "mmar": {
+      "weight": 1.0,
+      "group": "audio",
+      "higher_is_better": true
+    },
+    "mmmu_pro": {
+      "weight": 1.0,
+      "group": "image",
+      "higher_is_better": true
+    },
+    "jointavbench": {
+      "weight": 1.0,
+      "group": "omni",
+      "higher_is_better": true
+    },
+    "video_mmmu": {
+      "weight": 1.0,
+      "group": "video",
+      "higher_is_better": true
+    },
+    "videomme_v2": {
+      "weight": 1.0,
+      "group": "video",
+      "higher_is_better": true
+    },
+    "omnivideobench": {
+      "weight": 1.0,
+      "group": "omni",
+      "higher_is_better": true
+    },
+    "mmswe": {
+      "weight": 1.0,
+      "group": "code",
+      "higher_is_better": true
+    }
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "benchmark_id": "jointavbench",
+  "benchmark_name": "JointAVBench (joint audio-video understanding)",
+  "model_id": "Qwen/Qwen3-Omni-30B-A3B-Instruct",
+  "model_short_name": "qwen3-omni-30b",
+  "num_hours": 10
+}

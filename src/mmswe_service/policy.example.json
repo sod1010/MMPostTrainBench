@@ -1,0 +1,88 @@
+{
+  "state": "/srv/mmptb-service/private",
+  "socket": "/run/mmptb-service/broker.sock",
+  "docker": "/usr/bin/docker",
+  "container_profile": "strict-v1",
+  "instance_resources": {
+    "cpus": 8,
+    "memory_gib": 16,
+    "pids": 512
+  },
+  "train_image": "registry.example/mmptb-train@sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "generate_image": "registry.example/mmptb-generate@sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "grader_python": "/opt/swe-venv/bin/python3.12",
+  "cache": "/srv/mmptb-service/cache",
+  "baseline": "/srv/mmptb-service/base-model",
+  "dataset": "SWE-bench/SWE-bench_Multimodal",
+  "dev_limit": 100,
+  "test_limit": 480,
+  "image_manifest_sha256": "70ad69bd6b9ded297d3a682e11eb19408b57342628ff4068a7e2b5aad28826ba",
+  "asset_manifest_sha256": "925f0f2845b644a76089e464a30d14399983e532ff492bda6382707a5cfc39f5",
+  "profiles": {
+    "train": {
+      "timeout": 3600,
+      "cpus": 32,
+      "memory_gib": 512,
+      "pids": 1024,
+      "gpus": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "artifact_bytes": 100000000000
+    },
+    "score": {
+      "timeout": 7200,
+      "cpus": 32,
+      "memory_gib": 256,
+      "pids": 1024,
+      "gpus": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "artifact_bytes": 100000000000
+    }
+  },
+  "runs": {
+    "gpt56": {
+      "uid": 21001,
+      "workspace": "/srv/mmptb-runs/gpt56",
+      "budget_seconds": 86400
+    },
+    "gpt56terra": {
+      "uid": 21002,
+      "workspace": "/srv/mmptb-runs/gpt56terra",
+      "budget_seconds": 86400
+    },
+    "opus5": {
+      "uid": 21003,
+      "workspace": "/srv/mmptb-runs/opus5",
+      "budget_seconds": 86400
+    },
+    "opus48": {
+      "uid": 21004,
+      "workspace": "/srv/mmptb-runs/opus48",
+      "budget_seconds": 86400
+    }
+  },
+  "evaluation_contract": {
+    "path": "/srv/mmptb-service/cache/evaluation_contract.json",
+    "sha256": "REPLACE_WITH_ACTUAL_CONTRACT_SHA256"
+  },
+  "offline_resources": null,
+  "baseline_manifest": {
+    "path": "/srv/mmptb/baseline_manifest.json",
+    "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+  }
+}

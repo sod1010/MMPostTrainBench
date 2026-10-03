@@ -1,0 +1,141 @@
+# mmposttrainbench — source-preview suite manifest.
+# Reference scores and split sizes match the paper's Tables 2 and 7.
+# n_full is the total pool; n_eval is the final-test denominator.
+# See docs/validation.md for runtime and dataset-manifest requirements.
+#
+# The MODEL is the only variable across a run; everything else — dataset, eval
+# recipe, grader, anti-cheat gate, baseline — is PINNED here. Red line: change a
+# dataset repo or a bench's eval recipe => that bench's baseline must be re-measured.
+#
+# Run one bench:     bash run_task.sh <bench> <agent> [model]
+#   e.g.             bash run_task.sh mmau claude-code anthropic.claude-opus-4-8
+# Self-test a bench: bash run_task.sh <bench> oracle        # no model; must reproduce baseline
+#
+# This file is a READ-ONLY index over the existing sources of truth (it does not
+# replace them): baselines -> src/eval/baselines.json ; dataset origins ->
+# src/docker/resources.json ; per-bench eval recipe -> src/docker/bench_recipes.sh.
+
+base_model: Qwen/Qwen3-Omni-30B-A3B-Instruct   # frozen reference the baselines below were measured on
+runner: src/docker/run_loop.sh                 # pure `docker run`, single GPU host, NO scheduler required
+default_backend: docker                        # supported backend in this distribution
+isolation: separate-verifier                   # agent & grader in DIFFERENT containers; tests/ baked into the
+                                               # verifier image at build time (agent has no shell access to
+                                               # the grader, the answers, or the eval data)
+anti_cheat_gate: src/docker/cheat_gate.sh      # LLM judge (+ optional contamination); on a cheat verdict the
+                                               # reward is reset to the base-model baseline below
+
+# Metric contract: every bench emits ONE reward in [0,1] to /logs/verifier/reward.txt.
+#   accuracy      = fraction correct  (the 7 perception MCQ/QA benches)
+#   resolved_rate = FAIL_TO_PASS + PASS_TO_PASS all green in the instance's REAL repo
+#                   (mmswe), normalized onto the same [0,1] "accuracy" scale.
+# eval recipe shapes (see bench_recipes.sh): self-runner | lmms-eval | official | two-stage
+
+tasks:
+  mmau:
+    recipe: harbor_tasks/mmposttrainbench-mmau-qwen3-omni-30b
+    modality: audio
+    dataset: {repo: lmms-lab-audio/mmau, type: dataset}
+    eval: self-runner
+    metric: accuracy
+    n_full: 1000
+    n_dev: 332
+    n_eval: 668
+    baseline_split: eval
+    baseline: 0.486
+    gpus: 8
+
+  mmar:
+    recipe: harbor_tasks/mmposttrainbench-mmar-qwen3-omni-30b
+    modality: audio
+    dataset: {repo: ngqtrung/mmar, type: dataset, needs_token: true}
+    eval: self-runner
+    metric: accuracy
+    n_full: 1000
+    n_dev: 332
+    n_eval: 668
+    baseline_split: eval
+    baseline: 0.724
+    gpus: 8
+
+  mmmu_pro:
+    recipe: harbor_tasks/mmposttrainbench-mmmu_pro-qwen3-omni-30b
+    modality: image
+    dataset: {repo: MMMU/MMMU_Pro, type: dataset}
+    eval: lmms-eval
+    metric: accuracy
+    n_full: 1730
+    n_dev: 558
+    n_eval: 1172
+    baseline_split: eval
+    baseline: 0.4191
+    gpus: 8
+
+  video_mmmu:
+    recipe: harbor_tasks/mmposttrainbench-video_mmmu-qwen3-omni-30b
+    modality: video
+    dataset: {repo: lmms-eval/VideoMMMU, type: dataset}
+    eval: lmms-eval
+    metric: accuracy
+    n_full: 300
+    n_dev: 98
+    n_eval: 202
+    baseline_split: eval
+    baseline: 0.6
+    gpus: 8
+
+  videomme_v2:
+    recipe: harbor_tasks/mmposttrainbench-videomme_v2-qwen3-omni-30b
+    modality: video
+    dataset: {repo: MME-Benchmarks/Video-MME-v2, type: dataset}
+    eval: lmms-eval
+    metric: accuracy
+    n_full: 3200
+    n_dev: 1003
+    n_eval: 2197
+    baseline_split: eval
+    baseline: 0.2481
+    gpus: 8
+
+  jointavbench:
+    recipe: harbor_tasks/mmposttrainbench-jointavbench-qwen3-omni-30b
+    modality: omni
+    dataset: {repo: roverx12345/jointavbench, type: dataset}
+    eval: self-runner
+    metric: accuracy
+    n_full: 2853
+    n_dev: 905
+    n_eval: 1948
+    baseline_split: eval
+    baseline: 0.5994
+    gpus: 8
+
+  omnivideobench:
+    recipe: harbor_tasks/mmposttrainbench-omnivideobench-qwen3-omni-30b
+    modality: omni
+    dataset: {repo: NJU-LINK/OmniVideoBench, type: dataset}
+    eval: official
+    metric: accuracy
+    n_full: 1000
+    n_dev: 332
+    n_eval: 668
+    baseline_split: eval
+    baseline: 0.3961
+    gpus: 8
+
+  mmswe:
+    recipe: harbor_tasks/mmposttrainbench-mmswe-qwen3-omni-30b
+    modality: image+code
+    dataset: {repo: SWE-bench/SWE-bench_Multimodal, type: dataset}
+    eval: two-stage                 # OMNI_PY generates patches -> swebench venv grades them for real
+    metric: resolved_rate
+    n_full: 580
+    n_dev: 100
+    n_eval: 480
+    baseline_split: eval
+    baseline: 0.0229
+    dataset_splits: {val: dev, eval: test}
+    gpus: 8
+    extra_requirements:              # beyond the shared docker path (see src/docker/config.env mmswe block)
+      - "python venv with swebench==5.0.2"
+      - "outbound HTTPS to a container registry + blob mirror + each instance's screenshot host"
+      - "unshare + chroot capability in the verifier container (privileged-ish: su/setgroups must work)"

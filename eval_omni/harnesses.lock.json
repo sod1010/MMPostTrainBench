@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "verification": "sha256(sorted relative-path TAB file-sha256 NEWLINE); excludes .git, __pycache__, *.egg-info, *.pyc, *.pyo, *.log",
+  "harnesses": [
+    {
+      "name": "lmms-eval",
+      "url": "https://github.com/EvolvingLMMs-Lab/lmms-eval.git",
+      "commit": "9a337637931c6817ab794d7a32f2f135fb17ca1b",
+      "paths": [
+        "."
+      ],
+      "patches": [],
+      "source_tree": {
+        "file_count": 3323,
+        "sha256": "897f8347ab8a0abcfbf2115dc2bc43322d2db580827b1880ca15499d92e51699"
+      },
+      "provenance": "All 3323 files of the retained live snapshot match this upstream Git tree byte for byte."
+    },
+    {
+      "name": "OmniVideoBench",
+      "url": "https://github.com/NJU-LINK/OmniVideoBench.git",
+      "commit": "fb7a5603bad0c08e28754a670001f04b45983ce3",
+      "paths": [
+        ".gitignore",
+        "README.md",
+        "dataloader.py",
+        "dataloader_hf.py",
+        "envs",
+        "eval",
+        "utils"
+      ],
+      "patches": [
+        {
+          "path": "patches/omnivideobench-qwen3-omni.patch",
+          "sha256": "0d4432dc35a0fbe4779c2d2b0e50add3455dc5d1405a922c925188fe1a715242"
+        }
+      ],
+      "source_tree": {
+        "file_count": 35,
+        "sha256": "380b58b093c1b9c19b16c1ba552fd49d3cc31459a976f8565eead5db56d3a08c"
+      },
+      "provenance": "Retained runtime source matches this commit except eval/qwen3_omni_eval.py, reconstructed by the listed patch."
+    }
+  ]
+}
