@@ -25,7 +25,7 @@ export HF_TOKEN
 # The HF CLI reads HF_TOKEN from the environment; keep it out of process argv.
 
 HF_BIN="${HF_BIN:-hf}"
-PY="${PREPARE_PY:-/usr/bin/python}"
+PY="${PREPARE_PY:-python3}"
 command -v "$HF_BIN" >/dev/null || { echo "ERROR: '$HF_BIN' CLI not found"; exit 1; }
 [ -f "$MANIFEST" ] || { echo "ERROR: manifest $MANIFEST not found"; exit 1; }
 mkdir -p "$HF_CACHE_DIR" "$DATA_DIR"
@@ -44,12 +44,15 @@ fi
 
 # ---- 2. per-bench datasets (generic loop over resources.json) ----------------
 # emit: "<id>\t<repo>\t<cache_glob>\t<post>\t<needs_token>" per bench
-mapfile -t ROWS < <("$PY" - "$MANIFEST" <<'PY'
+ROWS=()
+while IFS= read -r resource_row; do ROWS+=("$resource_row"); done < <("$PY" - "$MANIFEST" <<'PY'
 import json, os, sys
 m = json.load(open(sys.argv[1]))
 for b in m["benches"]:
     repo = os.environ.get(b["id"].upper() + "_REPO", b["repo"])
-    print("\t".join([b["id"], repo, b.get("cache_glob", "*"+b["id"]+"*"),
+    if any("|" in str(x) or "\n" in str(x) for x in (repo, b["id"], b.get("cache_glob", ""), b.get("post", ""))):
+        raise ValueError("Invalid delimiter in resource manifest")
+    print("|".join([b["id"], repo, b.get("cache_glob", "*"+b["id"]+"*"),
                      b.get("post", ""), "1" if b.get("needs_token") else "0"]))
 PY
 )
@@ -59,16 +62,14 @@ want_bench() { [ ${#WANT[@]} -eq 0 ] && return 0; for w in "${WANT[@]}"; do [ "$
 # --- post-processing hooks ----------------------------------------------------
 # omnivideobench: official repo -> our local layout via the existing converter.
 omnivideobench_convert() {  # $1=snapshot_dir
-    local out="${OVB_DATA:-$DATA_DIR/OmniVideoBench_local/data.json}"
+    local out="${OVB_DATA:-$DATA_DIR/evaluationbench/OmniVideoBench_local/data.json}"
     local vid="${OVB_VIDEO_DIR:-$DATA_DIR/OmniVideoBench/videos_local}"
     local conv="$REPO_ROOT/eval_omni/runners/convert_omnivideobench.py"
-    if [ -f "$out" ]; then echo "    omnivideobench already converted -> $out"; return 0; fi
     if [ -f "$conv" ]; then
         echo "    converting OmniVideoBench -> $out (videos -> $vid)"
-        "$PY" "$conv" --src "$1" --out "$out" --video-dir "$vid" || \
-            echo "    NOTE: convert_omnivideobench.py needs a --src layout check; snapshot at $1"
+        "$PY" "$conv" --src "$1" --out "$out" --video-dir "$vid"
     else
-        echo "    NOTE: converter missing; point OVB_DATA/OVB_VIDEO_DIR at the snapshot $1"
+        echo "ERROR: converter missing" >&2; return 1
     fi
 }
 
@@ -76,13 +77,22 @@ omnivideobench_convert() {  # $1=snapshot_dir
 #   JOINTAV_DATA=<dir>/jointavbench.json + videos/<qid>.mp4. The HF repo carries the
 #   QA json + video files; stage them into the expected layout.
 jointavbench_convert() {  # $1=snapshot_dir
-    local dst="${JOINTAV_DATA:-$DATA_DIR/JointAVBench/jointavbench.json}"
+    local dst="${JOINTAV_DATA:-$DATA_DIR/evaluationbench/JointAVBench/jointavbench.json}"
     local dstdir; dstdir="$(dirname "$dst")"
     if [ -f "$dst" ]; then echo "    jointavbench already staged -> $dst"; return 0; fi
     mkdir -p "$dstdir/videos"
-    local j; j="$(find "$1" -maxdepth 2 -iname '*.json' | head -1)"
-    if [ -n "$j" ]; then cp "$j" "$dst"; fi
-    find "$1" -maxdepth 3 -iname '*.mp4' -exec ln -sf {} "$dstdir/videos/" \; 2>/dev/null || true
+    [ -f "$1/jointavbench.json" ] || { echo "ERROR: missing JointAVBench annotation" >&2; return 1; }
+    cp "$1/jointavbench.json" "$dst"
+    "$PY" - "$1/videos" "$dstdir/videos" <<'PYMEDIA'
+import os,sys
+from pathlib import Path
+src,dst=map(Path,sys.argv[1:]); media=list(src.glob('*.mp4'))
+if not media: raise SystemExit('Missing JointAVBench videos')
+for p in media:
+    q=dst/p.name
+    if q.exists() or q.is_symlink(): q.unlink()
+    q.symlink_to(os.path.relpath(p.resolve(),dst.resolve()))
+PYMEDIA
     echo "    jointavbench staged from $1 -> $dst (set JOINTAV_DATA / JOINTAV_MEDIA_ROOT if the repo layout differs)"
 }
 
@@ -104,18 +114,19 @@ videomme_v2_extract() {  # $1=snapshot_dir
 }
 
 for row in "${ROWS[@]}"; do
-    IFS=$'\t' read -r id repo cache_glob post needs_token <<< "$row"
+    IFS='|' read -r id repo cache_glob post needs_token <<< "$row"
     want_bench "$id" || continue
     if [ "$needs_token" = "1" ] && [ -z "${HF_TOKEN:-}" ]; then
-        echo "=== WARN: $id ($repo) needs an HF token; set HF_TOKEN_FILE in config.env ==="
+        echo "ERROR: $id requires approved Hugging Face access and HF_TOKEN_FILE" >&2; exit 1
     fi
+    case "$post" in ""|omnivideobench_convert|jointavbench_convert|videomme_v2_extract) ;; *) echo "Invalid post handler" >&2; exit 1;; esac
     echo "=== $id  <-  $repo ==="
     if [ -n "$post" ]; then
         # convert/extract benches: pull the repo into a staging dir, then post-process
         stage="$DATA_DIR/_staging/$id"; mkdir -p "$stage"
         if ! find "$stage" -maxdepth 3 -type f | grep -q .; then
             "$HF_BIN" download "$repo" --repo-type dataset --local-dir "$stage" || \
-                { echo "    download failed for $repo (check token/mirror)"; continue; }
+                { echo "    download failed for $repo (check token/mirror)" >&2; exit 1; }
         fi
         "$post" "$stage"
     else
@@ -124,7 +135,7 @@ for row in "${ROWS[@]}"; do
             echo "    already cached under $HF_CACHE_DIR — skip"
         else
             HF_HOME="$HF_CACHE_DIR" "$HF_BIN" download "$repo" --repo-type dataset || \
-                echo "    download failed for $repo (check token/mirror)"
+                { echo "    download failed for $repo (check token/mirror)" >&2; exit 1; }
         fi
     fi
 done

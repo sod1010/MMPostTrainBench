@@ -47,20 +47,21 @@ class VerifierRoleTests(unittest.TestCase):
                  ({"MMPTB_ROLE": "agent"}, "eval", True))
         for overrides, expected, pilot in cases:
             with self.subTest(overrides=overrides, pilot=pilot), tempfile.TemporaryDirectory() as td:
-                root = Path(td)
+                root = Path(td).resolve()
                 bin_dir = root / "bin"
                 bin_dir.mkdir()
                 launcher = root / "run_verifier.sh"
                 shutil.copyfile(ROOT / "src/docker/run_verifier.sh", launcher)
-                model = root / "workspace/final_model"
+                shutil.copyfile(ROOT / "src/docker/runtime_paths.py", root / "runtime_paths.py")
+                model = root / "workspaces/run/final_model"
                 model.mkdir(parents=True)
                 (model / "config.json").write_text("{}")
-                config = dict(REPO_ROOT=str(ROOT), MODEL_DIR=str(model),
-                              WORKSPACE_HOST=str(model.parent), LOGS_HOST=str(root / "logs"),
+                config = dict(REPO_ROOT=str(ROOT), MODEL_DIR=str(root / "models/base"), MMPTB_ROOT=str(root),
+                              WORKSPACE_HOST=str(model.parent), LOGS_HOST=str(root / "logs/run"),
                               HF_CACHE_DIR=str(root / "cache"), DATA_DIR=str(root / "data"),
                               GPUS="all", VERIFIER_IMAGE="fixture-verifier", CODEX_API_KEY="")
                 (root / "config.env").write_text("\n".join(
-                    key + "=" + shlex.quote(value) for key, value in config.items()) + "\n")
+                    "export " + key + "=" + shlex.quote(value) for key, value in config.items()) + "\n")
                 capture = root / "capture.py"
                 capture.write_text("import json, os, pathlib, sys\n"
                                    "pathlib.Path(os.environ['CAPTURE_PATH']).write_text(json.dumps(sys.argv[1:]))\n")
@@ -110,7 +111,7 @@ class VerifierRoleTests(unittest.TestCase):
                                         ({"MMPTB_ROLE": "agent", "EVAL_SPLIT": "eval"}, "eval"),
                                         ({"MMPTB_ROLE": "agent", "EVAL_SPLIT": "val"}, "val")):
                 with self.subTest(source=source.relative_to(ROOT), overrides=overrides), tempfile.TemporaryDirectory() as td:
-                    root = Path(td)
+                    root = Path(td).resolve()
                     bin_dir = root / "bin"
                     bin_dir.mkdir()
                     for command in ("sleep", "nvidia-smi"):

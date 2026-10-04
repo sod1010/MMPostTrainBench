@@ -40,7 +40,7 @@ Usage:
          <out>/summary.json {resolved_ids, n, ...}
          <out>/<iid>/{pull.log, run_in_chroot.sh, eval.sh, patch.diff, test_output.txt}
 """
-import argparse, hashlib, json, os, re, shlex, shutil, subprocess, sys, tarfile, threading, time, urllib.parse, urllib.request
+import argparse, hashlib, json, os, re, shlex, shutil, stat, subprocess, sys, tarfile, threading, time, urllib.parse, urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
@@ -320,45 +320,191 @@ def _rm(path):
         pass
 
 
-def extract_layer(blob, root, logf):
-    """Extract one gzipped layer tar into root, honoring docker whiteouts."""
-    root = str(root)
-    skipped = 0
-    with tarfile.open(blob, "r:gz") as tf:
-        for m in tf:
-            name = m.name.lstrip("./")
-            if not name:
-                continue
-            bn = os.path.basename(name)
-            dirn = os.path.dirname(name)
-            if bn == ".wh..wh..opq":
-                d = os.path.join(root, dirn)
-                if os.path.isdir(d):
-                    for c in os.listdir(d):
-                        _rm(os.path.join(d, c))
-                continue
-            if bn.startswith(".wh."):
-                _rm(os.path.join(root, dirn, bn[4:]))
-                continue
-            target = os.path.join(root, name)
-            # remove conflicting node so files can replace dirs/symlinks and vice-versa
-            if (m.isdir() and os.path.islink(target)) or (not m.isdir() and os.path.isdir(target) and not os.path.islink(target)):
-                _rm(target)
-            elif os.path.islink(target) or os.path.isfile(target):
-                if not m.isdir():
-                    try:
-                        os.unlink(target)
-                    except OSError:
-                        pass
-            try:
-                tf.extract(m, root, set_attrs=True, numeric_owner=True, filter="fully_trusted")
-            except Exception as e:
-                skipped += 1
-                if skipped <= 5:
-                    logf.write(f"  skip {name}: {e}\n")
-    if skipped:
-        logf.write(f"  (extracted with {skipped} skipped members in {os.path.basename(blob)})\n")
+def _layer_member_parts(name):
+    """OCI member names are relative; links use separate chroot-style resolution."""
+    if not isinstance(name, str) or not name or '\x00' in name or name.startswith('/'):
+        raise RuntimeError('unsafe absolute or empty layer member')
+    parts = [p for p in name.split('/') if p not in ('', '.')]
+    if '..' in parts:
+        raise RuntimeError('layer member traverses its root')
+    return parts
 
+
+def _layer_directory(rootfd, parts, create=False):
+    """Resolve links as in chroot, then open each directory without following links.
+
+    Absolute rootfs symlinks remain absolute on disk for later chroot execution;
+    extraction interprets them relative to rootfd, never the host root. Directory
+    descriptors and O_NOFOLLOW prevent a changed link from redirecting writes.
+    """
+    pending, resolved, links = list(parts), [], 0
+    while pending:
+        part = pending.pop(0)
+        if part in ('', '.'):
+            continue
+        if part == '..':
+            if resolved:
+                resolved.pop()
+            continue
+        fd = os.dup(rootfd)
+        try:
+            for component in resolved:
+                new = os.open(component, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=fd)
+                os.close(fd)
+                fd = new
+            try:
+                info = os.stat(part, dir_fd=fd, follow_symlinks=False)
+            except FileNotFoundError:
+                if not create:
+                    raise
+                os.mkdir(part, 0o755, dir_fd=fd)
+                info = os.stat(part, dir_fd=fd, follow_symlinks=False)
+            if stat.S_ISLNK(info.st_mode):
+                links += 1
+                if links > 40:
+                    raise RuntimeError('layer symlink resolution limit')
+                link = os.readlink(part, dir_fd=fd)
+                if link.startswith('/'):
+                    resolved = []
+                pending = link.split('/') + pending
+            elif stat.S_ISDIR(info.st_mode):
+                resolved.append(part)
+            else:
+                raise RuntimeError('layer parent is not a directory')
+        finally:
+            os.close(fd)
+    fd = os.dup(rootfd)
+    try:
+        for part in resolved:
+            new = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=fd)
+            os.close(fd)
+            fd = new
+        return fd
+    except BaseException:
+        os.close(fd)
+        raise
+
+
+def _layer_remove(fd, name):
+    """Delete only the named child, including directories, without following links."""
+    try:
+        info = os.stat(name, dir_fd=fd, follow_symlinks=False)
+    except FileNotFoundError:
+        return
+    if stat.S_ISDIR(info.st_mode):
+        child = os.open(name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=fd)
+        try:
+            for entry in os.listdir(child):
+                _layer_remove(child, entry)
+        finally:
+            os.close(child)
+        os.rmdir(name, dir_fd=fd)
+    else:
+        os.unlink(name, dir_fd=fd)
+
+
+def _layer_metadata(fd, member):
+    if os.geteuid() == 0:
+        os.fchown(fd, member.uid, member.gid)
+    os.fchmod(fd, member.mode & 0o7777)
+    os.utime(fd, (member.mtime, member.mtime))
+
+
+def extract_layer(blob, root, logf):
+    """Contained OCI extraction, including whiteouts and root-relative symlinks.
+
+    Staging must remain operator-owned; no workload runs until all layers finish.
+    Unsupported devices and any extraction error invalidate the image rather than
+    silently continuing with an incomplete rootfs.
+    """
+    rootfd = os.open(root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    directories = {}
+    try:
+        with tarfile.open(blob, 'r:gz') as tf:
+            for member in tf:
+                parts = _layer_member_parts(member.name)
+                if not parts:
+                    continue  # conventional archive '.' root entry
+                name = parts[-1]
+                parent = _layer_directory(rootfd, parts[:-1], create=True)
+                try:
+                    if name == '.wh..wh..opq':
+                        for entry in os.listdir(parent):
+                            _layer_remove(parent, entry)
+                    elif name.startswith('.wh.'):
+                        victim = name[4:]
+                        if victim in ('', '.', '..'):
+                            raise RuntimeError('invalid layer whiteout')
+                        _layer_remove(parent, victim)
+                    elif member.isdir():
+                        try:
+                            info = os.stat(name, dir_fd=parent, follow_symlinks=False)
+                        except FileNotFoundError:
+                            info = None
+                        if info is not None and not stat.S_ISDIR(info.st_mode):
+                            _layer_remove(parent, name)
+                            info = None
+                        if info is None:
+                            os.mkdir(name, 0o755, dir_fd=parent)
+                        directories[tuple(parts)] = member
+                    elif member.isreg():
+                        _layer_remove(parent, name)
+                        fd = os.open(name, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+                                     0o600, dir_fd=parent)
+                        try:
+                            with tf.extractfile(member) as stream, os.fdopen(os.dup(fd), 'wb') as output:
+                                shutil.copyfileobj(stream, output, 1024*1024)
+                            _layer_metadata(fd, member)
+                        finally:
+                            os.close(fd)
+                    elif member.issym():
+                        if not member.linkname or '\x00' in member.linkname:
+                            raise RuntimeError('invalid layer symlink')
+                        _layer_remove(parent, name)
+                        os.symlink(member.linkname, name, dir_fd=parent)
+                        if os.geteuid() == 0:
+                            os.chown(name, member.uid, member.gid, dir_fd=parent, follow_symlinks=False)
+                    elif member.islnk():
+                        target = _layer_member_parts(member.linkname)
+                        if not target:
+                            raise RuntimeError('invalid layer hardlink')
+                        targetfd = _layer_directory(rootfd, target[:-1])
+                        try:
+                            info = os.stat(target[-1], dir_fd=targetfd, follow_symlinks=False)
+                            if not stat.S_ISREG(info.st_mode):
+                                raise RuntimeError('layer hardlink target must be a regular file')
+                            _layer_remove(parent, name)
+                            os.link(target[-1], name, src_dir_fd=targetfd, dst_dir_fd=parent,
+                                    follow_symlinks=False)
+                        finally:
+                            os.close(targetfd)
+                    else:
+                        raise RuntimeError('unsupported layer member type')
+                finally:
+                    os.close(parent)
+        # Apply directory metadata after children, deepest first. Replaced directory
+        # entries do not receive stale metadata from an earlier member.
+        for parts, member in sorted(directories.items(), key=lambda item: len(item[0]), reverse=True):
+            try:
+                parent = _layer_directory(rootfd, parts[:-1])
+            except FileNotFoundError:
+                continue  # an opaque whiteout may have removed this subtree
+            try:
+                try:
+                    info = os.stat(parts[-1], dir_fd=parent, follow_symlinks=False)
+                except FileNotFoundError:
+                    continue
+                if not stat.S_ISDIR(info.st_mode):
+                    continue
+                fd = os.open(parts[-1], os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=parent)
+                try:
+                    _layer_metadata(fd, member)
+                finally:
+                    os.close(fd)
+            finally:
+                os.close(parent)
+    finally:
+        os.close(rootfd)
 
 # ─────────────────────────── chroot exec ───────────────────────────
 def _env_exports(cfg):

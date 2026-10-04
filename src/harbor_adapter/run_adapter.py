@@ -54,8 +54,8 @@ def main():
     parser.add_argument(
         "--num-hours",
         type=int,
-        default=10,
-        help="Number of hours for the training task (default: 10)",
+        default=24,
+        help="Number of hours for the training task (default: 24)",
     )
     parser.add_argument(
         "--all", "-a",

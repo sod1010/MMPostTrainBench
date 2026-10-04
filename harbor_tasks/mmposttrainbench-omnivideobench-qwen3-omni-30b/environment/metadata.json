@@ -3,5 +3,5 @@
   "benchmark_name": "OmniVideoBench (audio-visual video QA)",
   "model_id": "Qwen/Qwen3-Omni-30B-A3B-Instruct",
   "model_short_name": "qwen3-omni-30b",
-  "num_hours": 10
+  "num_hours": 24
 }

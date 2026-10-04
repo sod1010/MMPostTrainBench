@@ -1,6 +1,6 @@
 #!/bin/bash
 
-NUM_HOURS=10
+NUM_HOURS=24
 START_FILE="/timer_start"
 
 if [ ! -f "$START_FILE" ]; then

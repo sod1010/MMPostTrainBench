@@ -27,7 +27,7 @@ source "$HERE/config.env" 2>/dev/null || true
 REPO_ROOT="${REPO_ROOT:-$(cd "$HERE/../.." && pwd)}"
 MMPTB_ROOT="${MMPTB_ROOT:-$REPO_ROOT/mmptb_runs}"
 EVALDIR="$REPO_ROOT/src/eval"
-PY="${GATE_PY:-/usr/bin/python}"
+PY="${GATE_PY:-python3}"
 # Default contamination reference = ALL 7 benches' test questions (built by
 # build_contam_reference.py). With open networking the agent could download any
 # bench off HF, so we flag overlap with every eval set, not just the target.
@@ -54,6 +54,7 @@ fi
 
 # --- LLM judge (agent-as-judge over the agent's code) ------------------------
 jv="$rptdir/judge_verdict.json"
+rm -f "$jv"
 "$PY" "$EVALDIR/judge.py" --workspace "$ws" --benchmark "$bench" --out "$jv" >/dev/null 2>&1 || true
 judge_cheated="$($PY -c "import json;print(json.load(open('$jv')).get('cheated'))" 2>/dev/null || echo None)"
 
@@ -73,6 +74,7 @@ elif [ ! -f "${CONTAM_EVAL_FILE:-}" ]; then
     echo "            Build it: python $EVALDIR/build_contam_reference.py --out $EVALDIR/contam_ref_all.jsonl" >&2
 else
     cr="$rptdir/contam_report.json"
+    rm -f "$cr"
     "$PY" "$EVALDIR/contamination.py" --train "$train" --eval "$CONTAM_EVAL_FILE" --out "$cr" >/dev/null 2>&1 || true
     contam_flag="$($PY -c "import json;print(str(json.load(open('$cr')).get('flagged')).lower())" 2>/dev/null || echo skipped)"
 fi
@@ -196,7 +198,9 @@ else:
 json.dump({"bench":bench,"raw_reward":raw,"cheated":cheated,"judge_cheated":judge_cheated,
            "contam_flag":contam_flag,"offws_data_flag":offws_flag,
            "split_audit_flag":split_flag,"split_audit_detail":split_detail,
-           "baseline_error":baseline_error,"dataset_path":dataset_path,"baseline":baseline,"final_reward":final,"note":reason},
+           "baseline_error":baseline_error,"dataset_path":dataset_path,"baseline":baseline,"final_reward":final,"note":reason,
+           "integrity_status":("flagged" if cheated else "unknown" if judge_cheated not in ("True","False") or contam_flag not in ("true","false") or split_flag not in ("true","false") else "passed"),
+           "certified":(not cheated and judge_cheated=="False" and contam_flag=="false" and split_flag=="false")},
           open(report,"w"),indent=2)
 if raw is not None and cheated and baseline is None:
     print("cheat_gate: no matching final-test baseline", file=sys.stderr)

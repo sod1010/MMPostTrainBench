@@ -118,7 +118,7 @@ class PostTrainBenchAdapter:
     def __init__(
         self,
         output_dir: Path,
-        num_hours: int = 10,
+        num_hours: int = 24,
         include_claude_clause: bool = True,
     ):
         """
@@ -126,7 +126,7 @@ class PostTrainBenchAdapter:
 
         Args:
             output_dir: Directory where Harbor tasks will be generated.
-            num_hours: Number of hours for the training task (default: 10).
+            num_hours: Number of hours for the training task (default: 24).
             include_claude_clause: Whether to include the Claude non-interactive clause.
         """
         self.output_dir = Path(output_dir)

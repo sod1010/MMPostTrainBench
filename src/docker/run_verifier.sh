@@ -14,6 +14,7 @@
 set -eo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$HERE/config.env"
+python3 "$HERE/runtime_paths.py" || exit 2
 
 FINAL_MODEL_SRC="${FINAL_MODEL_SRC:-$MODEL_DIR}"
 FINAL_MODEL_DST="$WORKSPACE_HOST/final_model"
@@ -80,13 +81,17 @@ docker run --rm --gpus "$GPUS" \
     --shm-size=32g \
     -e HF_HOME=/hf_cache \
     -e HF_HUB_OFFLINE=1 -e HF_DATASETS_OFFLINE=1 -e HF_HUB_DISABLE_XET=1 \
+    -e DATA_DIR=/data \
+    -e EVAL_BENCH_DIR=/data/evaluationbench \
+    -e JOINTAV_DATA=/data/evaluationbench/JointAVBench/jointavbench.json \
+    -e JOINTAV_MEDIA_ROOT=/data/evaluationbench/JointAVBench \
+    -e OVB_DATA=/data/evaluationbench/OmniVideoBench_local/data.json \
+    -e OVB_VIDEO_DIR=/data/OmniVideoBench/videos_local \
     -e TMPDIR=/tmp \
     -e VERIFIER_LIMIT="${VERIFIER_LIMIT:--1}" \
     -e EVAL_SPLIT="${VERIFIER_SPLIT:-eval}" \
     -e MMPTB_ROLE=verifier \
     -e LMMS_LOG_SAMPLES=1 \
-    -e CODEX_API_KEY \
-    -e OPENAI_API_KEY \
     -v "$WORKSPACE_HOST":/home/agent/workspace \
     -v "$LOGS_HOST":/logs \
     -v "$HF_CACHE_DIR":/hf_cache \

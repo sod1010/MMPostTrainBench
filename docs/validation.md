@@ -32,7 +32,7 @@ controlled-service backend remains experimental; see its deployment guide.
 
 ## Verification results
 
-The release passed 107 of 112 CPU regression tests, with five platform-dependent
+The corrected release passed 121 of 126 CPU regression tests, with five platform-dependent
 skips, plus 89 generated-bundle consistency checks. Python and shell syntax and
 local documentation links were checked. A real GPU smoke generated a response
 for a two-image development example. Native MMSWE grading passed a gold-patch
@@ -71,3 +71,12 @@ configuration for a run. Use the same protocol for base and submitted models. A 
 instance set requires its own measured reference; do not relabel partial results as a
 480-instance test score. The published numbers are reference metadata, not a claim
 that all paper experiments have been rerun from this source package.
+
+## Release corrections
+
+Task selection, 24-hour budgets, guarded opt-in run resets, structured data
+preparation, container dataset paths, contained image extraction and stale audit
+verdict handling have dedicated CPU fixtures. These are implementation checks,
+not new experimental results. Full public-data/container runs remain host-dependent.
+The disabled Harbor live workspace judge always marks integrity as unknown; use
+the separate operator audit gate and review incomplete checks.

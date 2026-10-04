@@ -35,7 +35,7 @@ def main():
     args = ap.parse_args()
     if not args.check:
         subprocess.run([sys.executable, str(ROOT / "src/harbor_adapter/run_adapter.py"),
-                        "--all", "-o", str(ROOT / "harbor_tasks")], cwd=ROOT, check=True)
+                        "--all", "--num-hours", "24", "-o", str(ROOT / "harbor_tasks")], cwd=ROOT, check=True)
         shutil.copyfile(ROOT / "src/eval/split_util.py", ROOT / "eval_omni/runners/split_util.py")
     mismatches = [str(dest.relative_to(ROOT)) for source, dest in copies()
                   if not dest.is_file() or source.read_bytes() != dest.read_bytes()]

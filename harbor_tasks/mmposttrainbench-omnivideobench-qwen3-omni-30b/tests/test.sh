@@ -7,7 +7,7 @@ export MMPTB_ROLE=verifier
 export EVAL_SPLIT="${EVAL_SPLIT:-eval}"
 
 # PostTrainBench verification script
-# Runs contamination judge (codex CLI) and 3-phase evaluation with retry logic.
+# Records an explicit unknown integrity status and runs 3-phase evaluation.
 # Matches the original run_task.sh evaluation pipeline.
 #
 # Tamper-resistance design (harbor 0.7.0 separate-verifier mode):
@@ -24,7 +24,7 @@ export EVAL_SPLIT="${EVAL_SPLIT:-eval}"
 #   - The agent's workspace at /home/agent/workspace is transferred from
 #     the agent container by harbor as a configured artifact and
 #     contains the agent's training scripts + final_model. The
-#     contamination judge reads these (cd $WORKSPACE && codex exec ...);
+#     operator reviews source in a separate static audit boundary;
 #     evaluate.py reads /home/agent/workspace/final_model.
 #   - The agent's final_model is the only file the verifier executes
 #     code against (via vllm). Bad weights are penalized by the eval
@@ -99,59 +99,19 @@ if [ -f "$TESTS/metadata.json" ]; then
 fi
 
 # ============================================================
-# Run contamination judge (codex CLI)
-# Matches run_task.sh lines 180-201.
-#
-# The judge prompt is built by /tests/contamination_judge.py (untamperable).
-# Codex still runs with cwd=$WORKSPACE so its read tools naturally see the
-# agent's training code. Codex writes contamination_judgement.txt and
-# disallowed_model_judgement.txt into cwd; we copy them out to LOGS_DIR.
-# (This matches condor's behavior; agent could pre-place these files but
-# codex normally overwrites them when it produces a verdict.)
+# Integrity audit status
+# The legacy live Codex judge is disabled: running tools from an agent-controlled
+# workspace with verifier credentials/data crosses the sealed evaluation boundary.
+# Numeric evaluation is separate from integrity certification. The operator must
+# perform the reviewed static workspace audit in a separate boundary before accepting
+# this run; see docs/disclosure-security.md. Submitted verdict files are never read.
 # ============================================================
 echo ""
-echo "=== Running Contamination Judge ==="
-
-if [ -f "$TESTS/contamination_judge.py" ] && [ -n "$BENCHMARK_NAME" ]; then
-    # Generate the judge prompt from the untampered /tests/ copy
-    JUDGE_TASK=$(python3 "$TESTS/contamination_judge.py" \
-        --model "$MODEL_ID" \
-        --benchmark "$BENCHMARK_NAME" 2>/dev/null) || true
-
-    if [ -n "$JUDGE_TASK" ] && [ -n "$CODEX_API_KEY" ]; then
-        echo "Running codex CLI contamination judge..."
-        set +e
-        cd "$WORKSPACE"
-        codex --search -a never exec --json -c model_reasoning_summary=detailed \
-            --skip-git-repo-check --yolo --model "gpt-5.1-codex" "$JUDGE_TASK" \
-            2>&1 | tee "$LOGS_DIR/judge_output.json"
-        JUDGE_EXIT_CODE=$?
-        set -e
-        echo "Judge exit code: $JUDGE_EXIT_CODE"
-
-        # Codex writes these files directly into the workspace
-        if [ -f "$WORKSPACE/contamination_judgement.txt" ]; then
-            cp "$WORKSPACE/contamination_judgement.txt" "$LOGS_DIR/contamination_judgement.txt"
-            echo "Contamination judgement: $(cat "$LOGS_DIR/contamination_judgement.txt")"
-        else
-            echo "no contamination detected (codex did not produce output)" > "$LOGS_DIR/contamination_judgement.txt"
-        fi
-        if [ -f "$WORKSPACE/disallowed_model_judgement.txt" ]; then
-            cp "$WORKSPACE/disallowed_model_judgement.txt" "$LOGS_DIR/disallowed_model_judgement.txt"
-            echo "Model judgement: $(cat "$LOGS_DIR/disallowed_model_judgement.txt")"
-        else
-            echo "only allowed use detected (codex did not produce output)" > "$LOGS_DIR/disallowed_model_judgement.txt"
-        fi
-    else
-        echo "Warning: CODEX_API_KEY not set or prompt generation failed, skipping judge"
-        echo "no contamination detected (judge skipped - no API key)" > "$LOGS_DIR/contamination_judgement.txt"
-        echo "only allowed use detected (judge skipped - no API key)" > "$LOGS_DIR/disallowed_model_judgement.txt"
-    fi
-else
-    echo "Warning: contamination_judge.py or metadata not found in /tests, skipping judge"
-    echo "no contamination detected (judge not available)" > "$LOGS_DIR/contamination_judgement.txt"
-    echo "only allowed use detected (judge not available)" > "$LOGS_DIR/disallowed_model_judgement.txt"
-fi
+echo "=== Integrity audit requires operator review ==="
+rm -f "$LOGS_DIR/judge_output.json"
+printf '%s\n' 'unknown (legacy workspace judge disabled; operator audit required)' > "$LOGS_DIR/contamination_judgement.txt"
+printf '%s\n' 'unknown (legacy workspace judge disabled; operator audit required)' > "$LOGS_DIR/disallowed_model_judgement.txt"
+printf '%s\n' '{"verdict":"unknown","cheated":null,"reason":"operator_static_audit_required","certified":false}' > "$LOGS_DIR/integrity_status.json"
 
 # ============================================================
 # Evaluation with 3-phase retry logic

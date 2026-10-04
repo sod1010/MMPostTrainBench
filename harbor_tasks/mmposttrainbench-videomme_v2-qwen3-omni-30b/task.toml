@@ -76,7 +76,7 @@ start_interval_sec = 1
 retries = 3
 
 [agent]
-timeout_sec = 36000.0
+timeout_sec = 86400.0
 
 # Single workspace artifact. In separate-verifier mode this `source`
 # is transferred from the agent env to the verifier env at the same

@@ -25,7 +25,7 @@ Store your best trained model in the folder \`final_model\`.
 
 ## Rules
 1. There will be no user interaction. You have to operate autonomously.
-2. You have a maximum of 10 hours. You can query how much time you have left by calling \`bash timer.sh\` in the current directory.
+2. You have a maximum of 24 hours. You can query how much time you have left by calling \`bash timer.sh\` in the current directory.
 3. Do not use SWE-bench Multimodal (dev split, real resolved rate) test data for training (neither questions, media, nor answers). Otherwise we will have data contamination.
 4. Do not modify evaluate.py or templates/ .
 5. Work only in the current directory and subdirectories. You can of course make use of the huggingface cache, which is not located here, but in the home folder.

@@ -1,49 +1,120 @@
 #!/usr/bin/env python3
-"""benchmarkall 的扁平 omnivideobench.jsonl → OmniVideoBench 官方评测脚本期望的分组 json。
+"""Normalize an authorized upstream OmniVideoBench snapshot for its dataloader.
 
-官方 dataloader(harness_repos/OmniVideoBench/dataloader.py)期望:
-  [ {"video": "<无扩展名文件名>", "duration": "MM:SS",
-     "questions": [ {"question":..., "options":[...], "correct_option":"A"} ] } ]
-  视频路径 = <video_dir>/<video>.mp4；duration 仅用于 max_duration 过滤。
-
-benchmarkall 每行:{task, prompt[[{video:oss://.../OmniEval/videos/video_N.mp4},{text}]], answer, question, options}
+Supports official grouped JSON/Parquet rows and explicit flat QA rows. Does not
+invent annotations or durations, download gated files, or redistribute media.
 """
-from __future__ import annotations
-import argparse, json, os, re
+import argparse
+import json
+import math
+import os
 from pathlib import Path
+import shutil
+import subprocess
 
-def main() -> int:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--src", default=os.environ.get("OVB_SRC_JSONL", "omnivideobench.jsonl"))
-    ap.add_argument("--out", default=os.environ.get("OVB_DATA", "OmniVideoBench_local/data.json"))
-    ap.add_argument("--duration", default="00:30", help="占位时长(< max_duration 即可;仅用于过滤,不影响真实抽帧)")
+
+def load_rows(src):
+    src = Path(src)
+    if src.is_dir():
+        paths = sorted(src.glob('data*.parquet')) or sorted(src.glob('data*.json'))
+        if not paths:
+            raise ValueError('Snapshot must contain data*.parquet or data*.json')
+        return [row for p in paths for row in load_rows(p)]
+    if src.suffix == '.parquet':
+        try:
+            import pyarrow.parquet as pq
+        except ImportError as exc:
+            raise ValueError('Install pyarrow on the preparation host for upstream Parquet') from exc
+        return pq.read_table(src).to_pylist()
+    if src.suffix == '.jsonl':
+        return [json.loads(line) for line in src.read_text().splitlines() if line.strip()]
+    rows = json.loads(src.read_text())
+    if not isinstance(rows, list):
+        raise ValueError('Annotations must be a list of records')
+    return rows
+
+
+def duration_string(value, media):
+    if isinstance(value, str) and value:
+        parts = value.split(':')
+        if len(parts) in (2, 3) and all(x.isdigit() for x in parts):
+            seconds = sum(int(x) * 60**i for i, x in enumerate(reversed(parts)))
+        else:
+            raise ValueError('Invalid duration')
+    elif isinstance(value, (float, int)) and math.isfinite(value) and value >= 0:
+        seconds = math.ceil(value)
+    else:
+        # Measure missing durations from the actual authorized media.
+        result = subprocess.run(['ffprobe', '-v', 'error', '-show_entries',
+                                 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1',
+                                 str(media)], check=True, capture_output=True, text=True)
+        seconds = math.ceil(float(result.stdout.strip()))
+    return f'{seconds // 60:02d}:{seconds % 60:02d}'
+
+
+def convert(src, out, video_dir):
+    src = Path(src); out = Path(out); dest = Path(video_dir)
+    media_root = src if src.is_dir() else src.parent
+    rows = load_rows(src)
+    if not rows:
+        raise ValueError('Empty upstream annotations')
+    normalized = []
+    media_files = {}
+    for row in rows:
+        video = row.get('video') or row.get('video_id')
+        if not isinstance(video, str) or not video or Path(video).name != video:
+            raise ValueError('Missing or unsafe video identifier; unsupported annotation schema')
+        video = video.removesuffix('.mp4')
+        media = media_root / 'videos' / f'{video}.mp4'
+        if not media.is_file():
+            raise ValueError(f'Missing authorized media for {video}')
+        questions = row.get('questions')
+        if isinstance(questions, str):
+            questions = json.loads(questions)
+        if questions is None and 'question' in row:
+            questions = [row]
+        if not isinstance(questions, list) or not questions:
+            raise ValueError('Missing questions; unsupported annotation schema')
+        qas = []
+        for q in questions:
+            options = q.get('options')
+            if isinstance(options, str):
+                options = json.loads(options)
+            answer = q.get('correct_option')
+            if not isinstance(q.get('question'), str) or not isinstance(options, list) or len(options) < 2:
+                raise ValueError('Invalid QA record')
+            if not isinstance(answer, str) or answer not in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[:len(options)]:
+                raise ValueError('Missing/invalid correct_option; refusing to guess answer')
+            qas.append({'question': q['question'], 'options': options, 'correct_option': answer})
+        normalized.append({'video': video, 'duration': duration_string(row.get('duration'), media), 'questions': qas})
+        media_files[video] = media
+    # Validate all records before writing any usable annotation output.
+    dest.mkdir(parents=True, exist_ok=True)
+    for video, media in media_files.items():
+        target = dest / f'{video}.mp4'
+        if target.exists() or target.is_symlink():
+            if target.resolve() != media.resolve():
+                raise ValueError(f'Conflicting media at {target}')
+        else:
+            target.symlink_to(os.path.relpath(media.resolve(), target.parent.resolve()))
+    out.parent.mkdir(parents=True, exist_ok=True)
+    tmp = out.with_suffix(out.suffix + '.tmp')
+    tmp.write_text(json.dumps(normalized, ensure_ascii=False, indent=2))
+    tmp.replace(out)
+    return sum(len(x['questions']) for x in normalized)
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument('--src', required=True)
+    ap.add_argument('--out', required=True)
+    ap.add_argument('--video-dir', required=True)
     args = ap.parse_args()
+    try:
+        n = convert(args.src, args.out, args.video_dir)
+    except (ValueError, OSError, subprocess.SubprocessError) as exc:
+        ap.exit(2, f'OmniVideoBench preparation failed: {exc}\n')
+    print(f'Validated {n} QA pairs -> {args.out}')
 
-    vpat = re.compile(r'oss://\S+/([^/"]+)\.mp4')
-    out = []
-    n_skip = 0
-    for line in open(args.src, encoding="utf-8"):
-        line = line.strip()
-        if not line:
-            continue
-        r = json.loads(line)
-        m = vpat.search(json.dumps(r, ensure_ascii=False))
-        if not m:
-            n_skip += 1
-            continue
-        out.append({
-            "video": m.group(1),                 # e.g. video_1  (dataloader 会补 .mp4)
-            "duration": args.duration,
-            "questions": [{
-                "question": r.get("question", ""),
-                "options": r.get("options", []),
-                "correct_option": str(r.get("answer", "")).strip(),
-            }],
-        })
-    Path(args.out).parent.mkdir(parents=True, exist_ok=True)
-    json.dump(out, open(args.out, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
-    print(f"[convert] {len(out)} 条 -> {args.out} (skipped {n_skip})")
-    return 0
-
-if __name__ == "__main__":
-    raise SystemExit(main())
+if __name__ == '__main__':
+    main()

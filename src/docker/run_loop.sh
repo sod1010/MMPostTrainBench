@@ -11,10 +11,24 @@ set -eo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$HERE/config.env"
 
-FRESH="${FRESH:-1}"   # 1 = wipe the workspace/logs before the run
+# Resolve one task for both research and scoring after configuration is loaded.
+if [ -n "${BENCH:-${BENCHMARK:-}}" ]; then
+    BENCH="${BENCH:-$BENCHMARK}"
+    case "$BENCH" in mmau|mmar|mmmu_pro|video_mmmu|videomme_v2|jointavbench|omnivideobench|mmswe) ;; *) echo "Invalid benchmark" >&2; exit 2;; esac
+    export BENCH BENCHMARK="$BENCH"
+    export TASK_DIR="$REPO_ROOT/harbor_tasks/mmposttrainbench-${BENCH}-qwen3-omni-30b"
+fi
+python3 "$HERE/runtime_paths.py" || exit 2
+FRESH="${FRESH:-0}"   # explicit opt-in reset, only validated dedicated run paths
 if [ "$FRESH" = "1" ]; then
     echo "=== fresh run: clearing $WORKSPACE_HOST and $LOGS_HOST ==="
     rm -rf "$WORKSPACE_HOST" "$LOGS_HOST"
+fi
+if [ "$FRESH" != "1" ] && [ "${RESUME:-0}" != "1" ]; then
+    if [ -d "$WORKSPACE_HOST" ] && [ -n "$(ls -A "$WORKSPACE_HOST")" ]; then
+        echo "Existing workspace: choose a new run directory, RESUME=1, or explicit FRESH=1" >&2
+        exit 2
+    fi
 fi
 mkdir -p "$WORKSPACE_HOST" "$LOGS_HOST"
 

@@ -1,5 +1,5 @@
 {
-  "_comment": "Declarative download manifest for mmposttrainbench (mirrors PostTrainBench's containers/download_hf_cache/resources.json idiom). prepare_data.sh reads this. All 8 eval benches have a PUBLIC HuggingFace origin; the internal OSS paths were only an operator-local cache. Override any repo via the env var named in <ID>_REPO (e.g. JOINTAVBENCH_REPO) to point at a mirror/fork.",
+  "_comment": "Public upstream resource manifest. Some datasets require approved access; source code does not redistribute their data.",
   "model": {
     "repo_env": "MODEL_REPO",
     "default_repo": "Qwen/Qwen3-Omni-30B-A3B-Instruct",
@@ -57,7 +57,8 @@
       "repo_type": "dataset",
       "cache_glob": "*OmniVideoBench*",
       "post": "omnivideobench_convert",
-      "note": "official OmniVideoBench. Converted to our local layout by eval_omni/runners/convert_omnivideobench.py (see post-step)."
+      "note": "Approved upstream snapshot: data.parquet and videos/. Converter validates grouped QA schema and media before scoring.",
+      "needs_token": true
     },
     {
       "id": "mmswe",

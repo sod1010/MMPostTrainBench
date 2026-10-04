@@ -26,6 +26,12 @@
 set -eo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$HERE/config.env"
+if [ -n "${BENCH:-${BENCHMARK:-}}" ]; then
+    selected_bench="${BENCH:-$BENCHMARK}"
+    case "$selected_bench" in mmau|mmar|mmmu_pro|video_mmmu|videomme_v2|jointavbench|omnivideobench|mmswe) ;; *) echo "Invalid benchmark" >&2; exit 2;; esac
+    TASK_DIR="$REPO_ROOT/harbor_tasks/mmposttrainbench-${selected_bench}-qwen3-omni-30b"
+fi
+python3 "$HERE/runtime_paths.py" || exit 2
 
 AGENT_ENGINE="${AGENT_ENGINE:-placeholder}"
 AGENT_MODEL="${AGENT_MODEL:-}"          # optional model-id pin; empty = CLI default
@@ -75,11 +81,11 @@ stage_base_as_final() {
 
 # agent timeout (seconds) from task.toml, for the real-agent budget.
 agent_timeout() {
-    python3 - "$TASK_DIR/task.toml" <<'PY' 2>/dev/null || echo 36000
+    python3 - "$TASK_DIR/task.toml" <<'PY' 2>/dev/null || echo 86400
 import re,sys
 t=open(sys.argv[1]).read()
 m=re.search(r'\[agent\][^\[]*?timeout_sec\s*=\s*([0-9.]+)', t, re.S)
-print(int(float(m.group(1))) if m else 36000)
+print(int(float(m.group(1))) if m else 86400)
 PY
 }
 

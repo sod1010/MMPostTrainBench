@@ -21,12 +21,18 @@ text. This is best-effort minimization, not a guarantee for arbitrary secret for
 or workspaces being modified concurrently. Redacted or omitted content is not proof
 of a clean run. Missing credentials still yield an explicit skipped audit.
 
-The separate Codex CLI judge in `src/harbor_adapter/template/tests/test.sh` uses
-tool access to the workspace and does not use that packer. The research CLIs also
-operate with runtime credentials. Their prompts, tool output and logs require a
-separate disclosure review; do not assume that the packer's filtering covers those
-paths. A stricter deployment needs a separate judge execution boundary and reviewed
-inputs, in addition to source cleanup.
+The legacy Harbor workspace Codex judge is disabled. Verifier output records
+`unknown` and `certified=false`, never submitted or stale verdict files. The
+verifier does not receive audit API keys. Numeric accuracy alone is not integrity
+certification. The Docker loop invokes the operator-side `cheat_gate.sh` static
+packer audit outside the workload; skipped or incomplete checks require independent
+operator review before reporting. Keep its private inputs, credentials and output
+separate from the agent. Research CLI prompts and logs still require disclosure
+review.
+
+MMSWE layer extraction uses contained directory descriptors and chroot-style
+symlink resolution. Unsupported special members or extraction errors invalidate
+the image; all official image variants have not been certified by CPU fixtures.
 
 Public HTTPS uses normal certificate verification. Dataset warmup optionally accepts
 an operator-approved CA for a managed proxy; it does not require a private CA and

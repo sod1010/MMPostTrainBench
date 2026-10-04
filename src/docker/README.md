@@ -59,7 +59,7 @@ bash run_seam_test.sh               # expect ~0.375 at limit=8
 bash run_verifier.sh                # scores base model as final_model (floor)
 
 # 4. CRITERION #3 — end-to-end loop: agent -> verifier -> reward.txt
-bash run_loop.sh                    # AGENT_ENGINE=placeholder (cheap plumbing proof)
+bash run_loop.sh                    # AGENT_ENGINE=placeholder (base-model plumbing check; FRESH=0)
 AGENT_ENGINE=claude-code ANTHROPIC_API_KEY=... bash run_loop.sh   # real run
 ```
 
@@ -137,3 +137,5 @@ must resolve under the workspace) is the backstop for that path.
 - **Contamination judge** runs only if `CODEX_API_KEY` (or `OPENAI_API_KEY`) is
   set; otherwise `test.sh` records "judge skipped" and proceeds. It ships in
   `tests/` only — never in the agent workspace (see the isolation contract).
+
+Run directories must be dedicated children of `$MMPTB_ROOT/workspaces/` and `$MMPTB_ROOT/logs/`. Use a fresh pair per experiment; only `FRESH=1` explicitly resets them. Task generation defaults to 24 hours. Install host `python3`, `huggingface_hub`, `pyarrow`, and `ffprobe`; upstream gated datasets require independently approved access.

@@ -122,21 +122,22 @@ class LauncherDisclosureTests(unittest.TestCase):
     def test_docker_credentials_reach_environment_but_not_argv(self):
         cases = [('run_agent.sh', ['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN',
                                   'OPENAI_API_KEY', 'GEMINI_API_KEY']),
-                 ('run_verifier.sh', ['CODEX_API_KEY', 'OPENAI_API_KEY'])]
+                 ('run_verifier.sh', [])]
         for launcher, keys in cases:
             with self.subTest(launcher=launcher), tempfile.TemporaryDirectory() as td:
-                root = Path(td)
+                root = Path(td).resolve()
                 shutil.copyfile(ROOT / 'src/docker' / launcher, root / launcher)
+                shutil.copyfile(ROOT / 'src/docker/runtime_paths.py', root / 'runtime_paths.py')
                 env = self.make_capture(root, 'docker', keys)
-                workspace = root / 'workspace'
+                workspace = root / 'workspaces/run'
                 (workspace / 'final_model').mkdir(parents=True)
                 (workspace / 'final_model/config.json').write_text('{}')
                 bundle = root / 'bundle'
                 (bundle / 'environment').mkdir(parents=True)
                 (bundle / 'instruction.md').write_text('Synthetic task')
                 (bundle / 'task.toml').write_text('[agent]\ntimeout_sec=1\n')
-                config = dict(WORKSPACE_HOST=str(workspace), LOGS_HOST=str(root / 'logs'),
-                              MODEL_DIR=str(workspace / 'final_model'), TASK_DIR=str(bundle),
+                config = dict(WORKSPACE_HOST=str(workspace), LOGS_HOST=str(root / 'logs/run'),
+                              MODEL_DIR=str(root / 'models/base'), TASK_DIR=str(bundle), REPO_ROOT=str(ROOT),
                               MMPTB_ROOT=str(root), HF_CACHE_DIR=str(root / 'cache'),
                               DATA_DIR=str(root / 'data'), GPUS='all',
                               AGENT_ENGINE='codex', AGENT_IMAGE='fixture', VERIFIER_IMAGE='fixture')
@@ -145,7 +146,7 @@ class LauncherDisclosureTests(unittest.TestCase):
                     env['EXPECTED_' + key] = config[key]
                 # Deliberately not exported: the launcher must export sourced values.
                 (root / 'config.env').write_text('\n'.join(
-                    k + '=' + shlex.quote(v) for k, v in config.items()) + '\n')
+                    'export ' + k + '=' + shlex.quote(v) for k, v in config.items()) + '\n')
                 run = subprocess.run(['bash', str(root / launcher)], env=env,
                                      capture_output=True, text=True, timeout=20)
                 self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
@@ -169,7 +170,7 @@ class LauncherDisclosureTests(unittest.TestCase):
                           HF_CACHE_DIR=str(root / 'cache'), DATA_DIR=str(root / 'data'),
                           MODEL_REPO='fixture/model', MODEL_DIR=str(root / 'model'))
             (root / 'config.env').write_text('\n'.join(
-                k + '=' + shlex.quote(v) for k, v in config.items()) + '\n')
+                'export ' + k + '=' + shlex.quote(v) for k, v in config.items()) + '\n')
             run = subprocess.run(['bash', str(root / 'prepare_data.sh')], env=env,
                                  capture_output=True, text=True, timeout=20)
             self.assertEqual(run.returncode, 23, run.stdout + run.stderr)
@@ -181,7 +182,7 @@ class LauncherDisclosureTests(unittest.TestCase):
     def test_warmup_ca_is_optional_and_explicit_missing_ca_fails(self):
         for mode in ('default', 'configured', 'missing'):
             with self.subTest(mode=mode), tempfile.TemporaryDirectory() as td:
-                root = Path(td)
+                root = Path(td).resolve()
                 shutil.copyfile(ROOT / 'src/docker/warmup_dataset.sh', root / 'warmup_dataset.sh')
                 env = self.make_capture(root, 'docker', [])
                 config = dict(MMPTB_ROOT=str(root), HF_CACHE_DIR=str(root / 'cache'),
@@ -192,7 +193,7 @@ class LauncherDisclosureTests(unittest.TestCase):
                 if mode == 'configured':
                     ca.write_text('synthetic certificate fixture; not used for TLS')
                 (root / 'config.env').write_text('\n'.join(
-                    k + '=' + shlex.quote(v) for k, v in config.items()) + '\n')
+                    'export ' + k + '=' + shlex.quote(v) for k, v in config.items()) + '\n')
                 run = subprocess.run(['bash', str(root / 'warmup_dataset.sh')], env=env,
                                      capture_output=True, text=True, timeout=20)
                 if mode == 'missing':
