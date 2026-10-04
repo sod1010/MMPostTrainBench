@@ -1,0 +1,285 @@
+\raggedbottom
+\section{Task and Evaluation Details}
+\label{app:protocols}
+
+\paragraph{Task suite and research setting.}
+Table~\ref{tab:appendix-tasks} lists the eight tasks, their development and test set sizes, and scoring measures. The understanding tasks use Qwen3-Omni-30B-A3B-Instruct as the post-training base. Training uses eight GPUs, with a default research limit of 24 hours per loop. The agent selects its data-construction procedure, training recipe, and sequence of experiments within the task's permitted resources. The reported model--benchmark target means use three independent research loops with fresh histories, the same base model, and the same per-loop budget.
+
+\begin{table}[!htbp]
+\miletablestyle
+\caption{Task categories, development and test set sizes, and evaluation measures.}
+\label{tab:appendix-tasks}
+\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}llrrl@{}}
+\toprule
+Task & Domain & Dev. & Test & Measure \\
+\midrule
+MMMU-Pro & Image & 558 & 1,172 & Answer accuracy \\
+MMAU & Audio & 332 & 668 & Answer accuracy \\
+MMAR & Audio & 332 & 668 & Answer accuracy \\
+Video-MMMU & Video & 98 & 202 & Answer accuracy \\
+VideoMME-v2 & Video & 1,003 & 2,197 & Answer accuracy \\
+JointAVBench & Omni & 905 & 1,948 & Answer accuracy \\
+OmniVideoBench & Omni & 332 & 668 & Answer accuracy \\
+SWE-bench Multimodal & Code & 100 & 480 & Resolved-instance rate \\
+\bottomrule
+\end{tabular*}
+\end{table}
+
+\paragraph{Development feedback and final evaluation.}
+Harbor-compatible task packages separate research execution from verification. Development feedback provides candidate scores, permitted examples, and execution diagnostics. Examples available for diagnosis are not thereby authorized as training supervision. Final test instances, reference answers, and scores remain unavailable to the research agent. At submission, weights, configuration, and loading dependencies are frozen. The verifier evaluates base and submitted models on the same fixed test instances with matched preprocessing, inference, and scoring procedures.
+
+\paragraph{Research configurations.}
+The six configurations pair GPT-5.6-sol and GPT-5.6-terra with Codex, Claude Opus 5 and Claude Opus 4.8 with Claude Code, Gemini 3.8 Flash with Gemini CLI, and Qwen 3.8 Omni Flash with Qwen Code.
+
+\paragraph{Scoring and aggregation.}
+Let $\widehat{s}_{a,b}$ be configuration $a$'s mean target score after applying the per-loop audit rule in Appendix~\ref{app:audit-coverage}, and let $s_b^0$ be the base score. For the eight tasks $\mathcal B$, the mean task score and mean change are
+\begin{equation}
+A_a=\frac{100}{|\mathcal B|}\sum_{b\in\mathcal B}\widehat{s}_{a,b},
+\qquad
+\overline{\Delta}_a=\frac{100}{|\mathcal B|}\sum_{b\in\mathcal B}(\widehat{s}_{a,b}-s_b^0).
+\label{eq:mean-accuracy-change}
+\end{equation}
+Tasks receive equal weight, and differences are calculated before rounding. SWE-bench Multimodal uses a 480-item test set with a base resolved-instance rate of 2.29\%. Its three-loop means are included in the eight-task aggregate. Non-target evaluation and candidate analysis use one selected loop from the three for each model--benchmark pair. These analyses and auxiliary comparisons are separate from the target means.
+
+\Needspace{24\baselineskip}
+\section{Additional Experimental Results}
+\label{app:additional-results}
+
+\subsection{Non-target Evaluation}
+\label{app:nontarget-matrix}
+Each target is assigned two fixed probes to test retention outside its target category (Table~\ref{tab:probeplan}). Image targets are checked on audio and joint audio-video understanding; audio targets are checked on image and joint audio-video understanding; video and omni targets are checked on image and audio tasks. SWE-bench Multimodal uses MMMU-Pro and MMAR to assess retention of image and audio understanding after multimodal code post-training. This fixed assignment supports comparisons across research configurations without selecting probes according to their observed gains.
+
+\begin{table}[!htbp]
+\miletablestyle
+\caption{Non-target probe assignments.}
+\label{tab:probeplan}
+\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}lll@{}}
+\toprule
+Target domain & Probe 1 & Probe 2 \\
+\midrule
+Image & MMAR & JointAVBench \\
+Audio & MMMU-Pro & JointAVBench \\
+Video & MMAR & MMMU-Pro \\
+Omni & MMAR & MMMU-Pro \\
+Code & MMMU-Pro & MMAR \\
+\bottomrule
+\end{tabular*}
+\end{table}
+
+For the submitted model $S_{a,b}$ and probe $p$, we compute $D_{a,b,p}=100[H_p(S_{a,b})-H_p(\theta_0)]$. Positive changes indicate improvement and negative changes indicate degradation. We average the two probe changes within a target and then weight all eight target tasks equally. These comparisons use one submitted model per target and configuration. The complete matrix contains 96 cells across six research configurations, eight target tasks, and two probes per target.
+
+\begin{table}[!htbp]
+\miletablestyle
+\caption{Matched baselines for non-target probes. SWE-bench Multimodal probes use the same submitted checkpoints as its target evaluation.}
+\label{tab:matched-probe-base}
+\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}llrr@{}}
+\toprule
+Probe setting & Probe & Test items & Base accuracy (\%) \\
+\midrule
+Gemini / Qwen & MMMU-Pro & 1,172 & 41.7235 \\
+ & MMAR & 668 & 72.9042 \\
+ & JointAVBench & 1,948 & 60.0616 \\
+\midrule
+SWE-bench Multimodal & MMMU-Pro & 1,730 & 41.91 \\
+ & MMAR & 1,000 & 73.60 \\
+\bottomrule
+\end{tabular*}
+\end{table}
+
+\begin{table}[!htbp]
+\miletablestyle
+\begingroup
+\fontsize{8}{9.5}\selectfont
+\setlength{\tabcolsep}{2pt}
+\caption{Complete non-target accuracy changes (pp). Columns follow the research configurations in the main table. Matched probe baselines are listed in Table~\ref{tab:matched-probe-base}.}
+\label{tab:complete-nontarget}
+\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}llrrrrrr@{}}
+\toprule
+Target & Probe & \shortstack{Claude\\Opus 5} & \shortstack{GPT-5.6\\sol} & \shortstack{Qwen 3.8\\Omni Flash} & \shortstack{GPT-5.6\\terra} & \shortstack{Gemini 3.8\\Flash} & \shortstack{Claude\\Opus 4.8} \\
+\midrule
+MMMU-Pro & MMAR & $+1.25$ & $+1.70$ & $-9.88$ & $+0.50$ & $-0.60$ & $-8.03$ \\
+ & JointAVBench & $+6.90$ & $-0.03$ & $+1.08$ & $-1.52$ & $+6.16$ & $-8.86$ \\
+\addlinespace[2pt]
+MMAU & MMMU-Pro & $-2.66$ & $-1.98$ & $-2.65$ & $-0.53$ & $-1.88$ & $+1.26$ \\
+ & JointAVBench & $+6.08$ & $-0.14$ & $+2.72$ & $+3.05$ & $-0.98$ & $+8.23$ \\
+\addlinespace[2pt]
+MMAR & MMMU-Pro & $-0.53$ & $-0.78$ & $+0.34$ & $-0.44$ & $-0.09$ & $-1.13$ \\
+ & JointAVBench & $-1.42$ & $-0.80$ & $+0.51$ & $-0.70$ & $-0.21$ & $+3.82$ \\
+\addlinespace[2pt]
+Video-MMMU & MMAR & $+1.10$ & $+2.45$ & $-7.04$ & $+0.80$ & $+0.30$ & $-9.38$ \\
+ & MMMU-Pro & $+1.26$ & $-0.44$ & $+4.69$ & $-0.02$ & $+3.41$ & $+3.48$ \\
+\addlinespace[2pt]
+VideoMME-v2 & MMAR & $+1.40$ & $+0.50$ & $-2.40$ & $+0.20$ & $-0.45$ & $-0.99$ \\
+ & MMMU-Pro & $+0.24$ & $+1.01$ & $-0.60$ & $-1.04$ & $-1.71$ & $+0.84$ \\
+\addlinespace[2pt]
+JointAVBench & MMAR & $-0.99$ & $+2.15$ & $-4.34$ & $+0.95$ & $-0.75$ & $-8.93$ \\
+ & MMMU-Pro & $-0.70$ & $-0.36$ & $-2.39$ & $-0.27$ & $-29.86$ & $-1.55$ \\
+\addlinespace[2pt]
+OmniVideoBench & MMAR & $+0.65$ & $+1.70$ & $+0.60$ & $+0.50$ & $+0.00$ & $-12.07$ \\
+ & MMMU-Pro & $-1.21$ & $-0.70$ & $-0.77$ & $+1.18$ & $+0.00$ & $-11.28$ \\
+\addlinespace[2pt]
+SWE-bench & MMMU-Pro & $+1.67$ & $+0.23$ & $+1.24$ & $+0.23$ & $+0.68$ & $+0.12$ \\
+Multimodal & MMAR & $-1.00$ & $-0.80$ & $-0.24$ & $-0.70$ & $-0.20$ & $-0.74$ \\
+\bottomrule
+\end{tabular*}
+\endgroup
+\end{table}
+
+\subsection{Resource Usage}
+Table~\ref{tab:appendix-resource} gives the numerical summaries behind the resource figure. Time and token usage describe the recorded research runs; they are considered alongside final accuracy. Agent tokens measure interaction workload rather than GPU training cost or monetary expenditure. These summaries do not constitute a matched experiment that varies only the resource budget.
+
+\begin{table}[!htbp]
+\miletablestyle
+\caption{Recorded resource summaries. Time is in hours and agent tokens in millions.}
+\label{tab:appendix-resource}
+\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}llrr@{}}
+\toprule
+Research model & Runtime & Mean time & Mean tokens \\
+\midrule
+GPT-5.6-sol & Codex & 21.7 & 103.9 \\
+Claude Opus 5 & Claude Code & 23.1 & 71.8 \\
+Qwen 3.8 Omni Flash & Qwen Code & 17.8 & 69.0 \\
+GPT-5.6-terra & Codex & 23.7 & 41.5 \\
+Gemini 3.8 Flash & Gemini CLI & 17.4 & 35.5 \\
+Claude Opus 4.8 & Claude Code & 9.1 & 23.0 \\
+\bottomrule
+\end{tabular*}
+\end{table}
+
+\section{Integrity Analysis}
+\label{app:audit-coverage}
+Audits examine training-data contamination, unauthorized workspace or data access, prohibited split use, and misuse of evaluation information. Records distinguish material available to an agent, confirmed access, and evidence of prohibited use. Automated flags identify cases for review.
+
+\paragraph{Coverage.}
+Table~\ref{tab:integrity} reports completed checks and recorded flags. For each of the six research configurations, the reported audit covers one selected loop per benchmark, giving eight audited loops per configuration. The 8/8 entries refer to these selected loops rather than all three loops used for target means. Ten selected loops were flagged.
+
+%
+\begin{table}[htbp]
+\miletablestyle
+\caption{\textbf{Recorded integrity flags and audit coverage.} Counts cover flags and completed checks.}
+\label{tab:integrity}
+\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}lrrrrr@{}}
+\toprule
+Research model & Flagged & Trajectory & Contamination & Workspace & Split \\
+\midrule
+GPT-5.6-sol & 2 & 8/8 & 8/8 & 8/8 & 8/8 \\
+Claude Opus 5 & 2 & 8/8 & 8/8 & 8/8 & 8/8 \\
+GPT-5.6-terra & 2 & 8/8 & 8/8 & 8/8 & 8/8 \\
+Claude Opus 4.8 & 1 & 8/8 & 8/8 & 8/8 & 8/8 \\
+Gemini 3.8 Flash & 2 & 8/8 & 8/8 & 8/8 & 8/8 \\
+Qwen 3.8 Omni Flash & 1 & 8/8 & 8/8 & 8/8 & 8/8 \\
+\bottomrule
+\end{tabular*}
+\end{table}
+
+
+\paragraph{Per-loop adjustment.}
+For submitted model $S_{a,b,r}$ in loop $r$, audit adjustment precedes averaging:
+\begin{equation}
+\widetilde{s}_{a,b,r}=\begin{cases}
+s_b^0, & \text{if loop }r\text{ triggers an audit reset},\\
+H_b(S_{a,b,r}), & \text{otherwise},
+\end{cases}
+\qquad
+\widehat{s}_{a,b}=\frac{1}{3}\sum_{r=1}^{3}\widetilde{s}_{a,b,r}.
+\label{eq:audited-three-run-mean}
+\end{equation}
+Only the flagged loop is reset; the resulting three-loop mean need not equal the base score. Table~\ref{tab:resets} pairs the original flagged-run scores with their replacements and updated means. The Gemini MMMU-Pro and JointAVBench flags correspond to reported adjusted means of 41.88\% and 64.91\%; the Qwen JointAVBench flag corresponds to 63.90\%. Non-target tables retain raw submitted-model comparisons against matched probe baselines.
+
+%
+%
+\begin{table}[!htbp]
+\miletablestyle
+
+\caption{Audit-triggering records and updated target means (\%). Raw and base scores refer to the flagged historical run; the last column averages three runs after per-loop audit adjustment.}\label{tab:resets}
+\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}llrrr@{}}
+\toprule
+Research model & Target & Raw run & Base reset & Three-run mean \\
+\midrule
+GPT-5.6-sol & MMMU-Pro & 41.38 & 41.91 & 41.88 \\
+GPT-5.6-sol & VideoMME-v2 & 24.35 & 24.81 & 24.35 \\
+Claude Opus 5 & MMAU & 50.45 & 48.60 & 50.25 \\
+Claude Opus 5 & OmniVideoBench & 42.38 & 39.61 & 42.40 \\
+GPT-5.6-terra & MMAR & 73.05 & 72.40 & 73.00 \\
+GPT-5.6-terra & JointAVBench & 67.92 & 59.94 & 59.97 \\
+Claude Opus 4.8 & JointAVBench & 65.20 & 59.94 & 58.84 \\
+Gemini 3.8 Flash & MMMU-Pro & 42.01 & 41.91 & 41.88 \\
+Gemini 3.8 Flash & JointAVBench & 71.30 & 59.94 & 64.91 \\
+Qwen 3.8 Omni Flash & JointAVBench & 68.42 & 59.94 & 63.90 \\
+\bottomrule
+\end{tabular*}
+\end{table}
+
+
+\section{MMResearch Implementation}
+\label{app:harness-implementation}
+
+MMResearch coordinates experiments within existing code-agent runtimes while retaining their native tools. It supplies research instructions and memory, validates round artifacts, and manages delivery. Debate combines Researcher, Engineer, Critic, and Artifact Analyst reviews, using independent Claude Code/Codex subagents or sequential reviews in other adapters. The procedures below expand Figure~\ref{fig:harness}.
+
+\subsection{Seven-Step Controller Procedure}
+\label{app:mmresearch-procedure}
+The retained model $\theta^\star$ starts from the base model. Each round produces a candidate and a decision without automatically replacing it. Screening and confirmation belong to \textsc{Evaluate}; promotion belongs to \textsc{Decide}.
+
+\par\begingroup\centering
+\begin{minipage}{0.95\linewidth}
+\begin{algorithm}[H]
+\small
+\DontPrintSemicolon
+\SetAlgoNlRelativeSize{-1}
+\SetAlgoLined
+\SetKwInput{KwInput}{Input}
+\SetKwInput{KwOutput}{Output}
+\SetKwComment{Comment}{\(\triangleright\) }{}
+\SetKw{Return}{return}
+\caption{MMResearch seven-step research loop}
+\label{alg:mmresearch-loop}
+\KwInput{Task contract $\mathcal{T}$, base model $\theta_0$, development evaluator $\mathcal{E}_{\mathrm{dev}}$, budget $B$}
+\KwOutput{Retained model $\theta^\star$ and its loading configuration}
+$\theta^\star \leftarrow \theta_0$; initialize or restore checkpoint and Global/Core/Archive memory\;
+\While{remaining budget permits another round}{
+  $m_t \leftarrow$ read Global and Core; retrieve relevant Archive records\;
+  $d_t \leftarrow \textsc{Select}(\mathcal{T},m_t)$\;
+  $(e_t,h_t) \leftarrow \textsc{Diagnose}(d_t)$ \Comment*[r]{anchor observations; separate hypotheses}
+  $p_t \leftarrow \textsc{Debate}(e_t,h_t,m_t)$\;
+  $(\theta_t,c_t) \leftarrow \textsc{Implement}(p_t)$ \Comment*[r]{save candidate and configuration}
+  $s_t \leftarrow \mathcal{E}_{\mathrm{dev}}^{\mathrm{screen}}(\theta_t)$ \Comment*[r]{\textsc{Evaluate}: screening}
+  $v_t \leftarrow \mathrm{not\ confirmed}$\;
+  \If{screening supports a proposed improvement}{
+    $v_t \leftarrow \mathcal{E}_{\mathrm{dev}}^{\mathrm{confirm}}(\theta_t,\theta^\star)$ \Comment*[r]{\textsc{Evaluate}: confirmation}
+  }
+  $r_t \leftarrow \textsc{Record}(e_t,h_t,p_t,\theta_t,c_t,s_t,v_t)$\;
+  Index round artifacts and lessons in memory\;
+  \eIf{records are valid and $v_t$ confirms improvement}{
+    $\theta^\star \leftarrow \theta_t$ \Comment*[r]{\textsc{Decide}: retain the confirmed candidate}
+  }{
+    Retain $\theta^\star$; choose refinement or a new direction \Comment*[r]{\textsc{Decide}}
+  }
+  Finalize the decision and checkpoint; refresh Global\;
+}
+Freeze $\theta^\star$ and its loading configuration before the budget expires\;
+\Return{$\theta^\star$ and its loading configuration}\;
+\end{algorithm}
+\end{minipage}\par
+\endgroup
+
+
+\Needspace{10\baselineskip}
+\paragraph{Confirmation and record validation.}
+Screening provides inexpensive evidence for choosing which directions warrant further evaluation. Confirmation re-evaluates a proposed improvement using authorized development data held apart from the screening feedback; it is distinct from the benchmark's sealed final test. Both results are recorded with the candidate they evaluate. The controller checks for the required round artifacts and confirmation evidence before accepting a promotion record. A missing record can trigger a bounded repair request; an execution failure is recorded as a failure and does not supply a candidate score. Candidate retention follows development evidence throughout the loop.
+
+\subsection{Memory Organization and Record Structure}
+\label{app:mmresearch-records}
+The three memory tiers separate a compact working summary from stable task knowledge and detailed research history. A single checkpoint stores the dynamic run state, including the current round and retained model. Global summarizes this checkpoint; a Core entry can point to it without maintaining a second, independently edited copy.
+
+\begin{center}
+\begin{tabularx}{\linewidth}{@{}lXX@{}}
+\toprule
+\textbf{Store} & \textbf{Stored information} & \textbf{Read and write points} \\
+\midrule
+Global & Current plan, retained-model summary, and critical lessons. & Read at startup and \textsc{Select}; refresh after the round decision. \\
+Core & Task rules, evaluator interface, environment facts, and reusable configurations. & Read the index at \textsc{Select}; load relevant values and add stable knowledge when established. \\
+Archive & Hypotheses, round outcomes, failures, detailed lessons, and media references. & Retrieve relevant entries during research; index new evidence and outcomes at \textsc{Record}. \\
+Checkpoint & Authoritative round, phase, retained candidate, and progress state. & Restore on resume; update after \textsc{Decide} and at finalization. \\
+\bottomrule
+\end{tabularx}
+\end{center}

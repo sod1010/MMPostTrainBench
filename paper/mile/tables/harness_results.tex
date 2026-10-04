@@ -1,0 +1,29 @@
+\begin{table}[!htbp]
+\miletablestyle
+\begingroup
+\fontsize{8}{9.5}\selectfont
+\setlength{\tabcolsep}{2.5pt}
+\renewcommand{\arraystretch}{1.10}
+\setlength{\abovecaptionskip}{4pt}
+\setlength{\belowcaptionskip}{4pt}
+\newcommand{\hc}[2]{#1\,{\fontsize{7}{8.5}\selectfont(#2)}}
+\caption{\textbf{Effect of MMResearch on submission quality.} Accuracy (\%) measures final model performance; parentheses report gains over the same harness without MMResearch (pp).}
+\label{tab:harness-results}
+%
+%
+\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}llrrrr@{}}
+\toprule
+\multirow{2}{*}{\textbf{Research model}} & \multirow{2}{*}{\textbf{Harness}} & \multicolumn{1}{c}{\textbf{MMMU-Pro}} & \multicolumn{1}{c}{\textbf{MMAR}} & \multicolumn{1}{c}{\textbf{VideoMME-v2}} & \multicolumn{1}{c}{\textbf{OmniVideoBench}} \\
+ & & \multicolumn{1}{c}{\textit{Image}} & \multicolumn{1}{c}{\textit{Audio}} & \multicolumn{1}{c}{\textit{Video}} & \multicolumn{1}{c}{\textit{Omni}} \\
+\midrule
+Claude Opus 4.8 & Claude Code & 41.72 & 66.77 & 22.89 & 31.86 \\
+ & + \harness{} & \hc{43.74}{+2.02} & \hc{72.40}{+5.63} & \hc{24.81}{+1.92} & \hc{39.61}{+7.75} \\
+\addlinespace[3pt]
+GPT-5.6-sol & Codex & 41.88 & 72.31 & 24.35 & 42.99 \\
+ & + \harness{} & \hc{44.21}{+2.33} & \hc{72.90}{+0.60} & \hc{24.81}{+0.46} & \hc{42.61}{-0.38} \\
+\midrule
+\multicolumn{2}{@{}l}{Base model (main-table reference)} & 41.91 & 72.40 & 24.81 & 39.61 \\
+\bottomrule
+\end{tabular*}
+\endgroup
+\end{table}

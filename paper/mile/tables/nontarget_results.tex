@@ -1,0 +1,25 @@
+\begin{table}[!htbp]
+\miletablestyle
+\caption{\textbf{Cross-modal capability retention.} Cells show mean accuracy changes over the two indicated non-target probes (pp): Image/MMMU-Pro, Audio/MMAR, and Omni/JointAVBench. Underlining indicates the best result in each row.}
+\label{tab:nontarget-results}
+\fontsize{8}{9.2}\selectfont
+\setlength{\tabcolsep}{2.5pt}
+\renewcommand{\arraystretch}{1.20}
+\begin{tabularx}{\linewidth}{@{}l@{\hspace{8pt}}l*{6}{>{\centering\arraybackslash}X}@{}}
+\toprule
+\textbf{\shortstack[l]{Target\\benchmark}} & \textbf{\shortstack[l]{Non-target\\modalities}} & \textbf{\shortstack{Claude\\Opus 5}} & \textbf{\shortstack{GPT-5.6\\sol}} & \textbf{\shortstack{GPT-5.6\\terra}} & \textbf{\shortstack{Gemini 3.8\\Flash}} & \textbf{\shortstack{Qwen 3.8\\Omni Flash}} & \textbf{\shortstack{Claude\\Opus 4.8}} \\
+\midrule
+MMMU-Pro & Audio, Omni & \underline{\signedgain{+4.08}} & \signedgain{+0.84} & \signedgain{-0.51} & \signedgain{+2.78} & \signedgain{-4.40} & \signedgain{-8.45} \\
+MMAR & Image, Omni & \signedgain{-0.98} & \signedgain{-0.79} & \signedgain{-0.57} & \signedgain{-0.15} & \signedgain{+0.43} & \underline{\signedgain{+1.35}} \\
+MMAU & Image, Omni & \signedgain{+1.71} & \signedgain{-1.06} & \signedgain{+1.26} & \signedgain{-1.43} & \signedgain{+0.04} & \underline{\signedgain{+4.75}} \\
+Video-MMMU & Image, Audio & \signedgain{+1.18} & \signedgain{+1.01} & \signedgain{+0.39} & \underline{\signedgain{+1.86}} & \signedgain{-1.17} & \signedgain{-2.95} \\
+VideoMME-v2 & Image, Audio & \underline{\signedgain{+0.82}} & \signedgain{+0.76} & \signedgain{-0.42} & \signedgain{-1.08} & \signedgain{-1.50} & \signedgain{-0.08} \\
+JointAVBench & Image, Audio & \signedgain{-0.85} & \underline{\signedgain{+0.90}} & \signedgain{+0.34} & \signedgain{-15.31} & \signedgain{-3.37} & \signedgain{-5.24} \\
+OmniVideoBench & Image, Audio & \signedgain{-0.28} & \signedgain{+0.50} & \underline{\signedgain{+0.84}} & \signedgain{+0.00} & \signedgain{-0.08} & \signedgain{-11.68} \\
+\shortstack[l]{SWE-bench\\Multimodal} & Image, Audio & \signedgain{+0.34} & \signedgain{-0.29} & \signedgain{-0.24} & \signedgain{+0.24} & \underline{\signedgain{+0.50}} & \signedgain{-0.31} \\
+\midrule
+\rowcolor{milelight}
+\multicolumn{2}{@{}l}{\textbf{Overall}} & \underline{\signedgain{+0.75}} & \signedgain{+0.23} & \signedgain{+0.14} & \signedgain{-1.64} & \signedgain{-1.20} & \signedgain{-2.83} \\
+\bottomrule
+\end{tabularx}
+\end{table}

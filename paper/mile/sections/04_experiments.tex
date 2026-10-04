@@ -1,0 +1,146 @@
+\section{Experiments}
+\label{sec:results}
+\subsection{Experimental Setup}
+\noindent\textbf{Tasks and Resources.}\quad
+All loops start from Qwen3-Omni-30B-A3B-Instruct~\citep{qwen3omni} on the eight-task suite spanning the Image, Audio, Video, Omni, and Code domains (Table~\ref{tab:tasks}). Training uses eight GPUs, with a default limit of 24 hours per loop.
+
+\noindent\textbf{Research Agents.}\quad
+We evaluate six research-model/runtime configurations: GPT-5.6-sol and GPT-5.6-terra with Codex; Claude Opus 5 and Claude Opus 4.8 with Claude Code; Gemini 3.8 Flash with Gemini CLI; and Qwen 3.8 Omni Flash with Qwen Code. These models direct experiments through their native runtimes, while Qwen3-Omni is the shared model being post-trained.
+
+\noindent\textbf{Evaluation Protocol.}\quad
+For each model--benchmark pair, we run three independent loops with fresh histories, the same base model, and the same budget. Development feedback guides research decisions; frozen submissions are independently evaluated on the same held-out test instances as the base. Table~\ref{tab:main} reports the three-loop mean, with identified audit-triggering loops reset to the base before averaging. We select one of the three loops per pair for non-target evaluation, candidate analysis, and the reported integrity audit. Audit coverage therefore comprises eight selected loops per research configuration.
+
+\Needspace{8\baselineskip}
+\subsection{Main Results}
+\paragraph{Model outcomes.}
+Across all eight tasks, 52.1\% of the 48 model--task means fall below the base; the largest mean gain is 0.73 pp (Table~\ref{tab:main}). Qwen 3.8 Omni Flash gains 2.80 pp on MMMU-Pro but loses 2.26 pp on OmniVideoBench. Gemini 3.8 Flash leads on MMAR yet regresses on both video tasks. Gains occur in 7 of 12 audio model--task pairs versus 3 of 12 video pairs, highlighting the difficulty of video post-training under the shared budget.
+
+\input{mile/tables/main_results}
+
+\paragraph{Cross-modal capability retention.}
+\label{sec:nontarget}
+Non-target evaluation reveals capability loss beyond the optimization target (Table~\ref{tab:nontarget-results}). For example, Qwen's MMMU-Pro submission loses 9.88 pp on MMAR. All six SWE-bench Multimodal configurations improve MMMU-Pro scores by 0.12--1.67 pp while reducing MMAR scores by 0.20--1.00 pp (Appendix~\ref{app:nontarget-matrix}). These results show that image-grounded software-repair research can also affect audio understanding. Target accuracy and non-target retention therefore capture distinct aspects of post-training quality.
+
+\input{mile/tables/nontarget_results}
+\FloatBarrier
+
+\par\vspace*{6pt}
+\noindent\begin{minipage}{\linewidth}
+\begin{minipage}[t]{0.54\linewidth}
+\vspace{0pt}
+\noindent\textbf{Resource Usage.}\quad
+Figure~\ref{fig:resource-usage} reports mean loop duration and agent token usage for the existing run set. GPT-5.6-terra averages 23.7 hours under the 24-hour budget, yet its mean task score remains 0.27 pp below the base (Table~\ref{tab:main}). Claude Opus 5 and GPT-5.6-sol achieve similar eight-task mean scores (44.42\% and 44.36\%), while Opus 5 uses about 31\% fewer tokens. Thus, longer runs and greater token expenditure do not necessarily yield stronger submitted models.
+\end{minipage}\hfill
+\begin{minipage}[t]{0.44\linewidth}
+\vspace{0pt}
+\centering
+\includegraphics[width=\linewidth,trim=0 10bp 0 0,clip]{mile/figures/resource_usage.pdf}
+\setlength{\abovecaptionskip}{2pt}
+\setlength{\belowcaptionskip}{0pt}
+\captionof{figure}{Mean time and tokens.}
+\label{fig:resource-usage}
+\end{minipage}
+\end{minipage}\par
+
+\Needspace{12\baselineskip}
+\paragraph{Iterative model improvement.}
+\label{sec:iteration}
+Further experimentation can degrade candidates, and final submissions trail the best evaluated candidate by up to 5.38 pp (Figure~\ref{fig:selfevolve-results}; Table~\ref{tab:iteration}). In the selected Qwen 3.8 Omni Flash loop on MMMU-Pro, candidates score 45.65\%, 44.71\%, and 43.94\% on the held-out test. The final experiment compresses training answers to at most 64 tokens and performs worse on both development and held-out data; other recipe changes prevent attributing this drop to compression alone. Development results are 62/137, 62/137, and 59/137, respectively. Submitting the second candidate avoids the latest regression but leaves a 0.94 pp gap: development feedback identifies the weakest candidate but cannot distinguish the first two.
+
+\begin{figure}[!htbp]
+\centering
+\begin{minipage}[t]{0.485\linewidth}
+\vspace{0pt}
+\centering
+\includegraphics[width=0.94\linewidth]{mile/figures/selfevolve_trajectory.pdf}
+\setlength{\abovecaptionskip}{3pt}
+\setlength{\belowcaptionskip}{0pt}
+\caption{\textbf{MMMU-Pro candidate accuracy.}}
+\label{fig:selfevolve-results}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.485\linewidth}
+\vspace{0pt}
+\centering
+\setlength{\abovecaptionskip}{0pt}
+\setlength{\belowcaptionskip}{4pt}
+\captionof{table}{\textbf{Submission loss.} $R^{\mathrm{rec}}$ is best-prior minus submitted accuracy (pp).}
+\label{tab:iteration}
+\input{mile/tables/iteration_results}
+\end{minipage}
+\end{figure}
+\FloatBarrier
+
+\par\medskip
+\noindent\begin{minipage}{\linewidth}
+\begin{minipage}[t]{0.56\linewidth}
+\vspace{0pt}
+\noindent\textbf{Research integrity.}\quad
+Observed violations include evaluation-data contamination and exploitation of answer-label patterns. Both can inflate scores without establishing improved multimodal capability. Figure~\ref{fig:integrity-bar} records ten flagged runs across six models and four categories. Four involve JointAVBench: GPT-5.6-terra, Claude Opus 4.8, Gemini, and Qwen. Of its 1,948 reference answers, 91.58\% are D. Gemini and Qwen predict D in 65.91\% and 72.64\% of cases, with macro recall of 45.15\% and 48.90\%, respectively. Always predicting D therefore yields a high score without interpreting media, illustrating how label shortcuts compromise evaluation.
+\end{minipage}\hfill
+\begin{minipage}[t]{0.42\linewidth}
+\vspace{0pt}
+\centering
+\includegraphics[width=\linewidth]{mile/figures/integrity_bar.pdf}
+\setlength{\abovecaptionskip}{2pt}
+\setlength{\belowcaptionskip}{0pt}
+\captionof{figure}{\textbf{Recorded integrity flags.}}
+\label{fig:integrity-bar}
+\end{minipage}
+\end{minipage}\par
+
+\Needspace{9\baselineskip}
+\subsection{MMResearch Evaluation}
+\label{sec:harness-eval}
+Table~\ref{tab:harness-results} evaluates \harness{} with Claude Opus 4.8/Claude Code and GPT-5.6-sol/Codex on four benchmarks spanning image, audio, video, and omni understanding. Both conditions share the same 24-hour research limit and development-evaluation budget. \textbf{MMResearch improves submission accuracy in seven of eight comparisons}: all four for Opus 4.8 and three for GPT-5.6-sol. Their MMMU-Pro gains are 2.02 and 2.33 pp, respectively.
+
+\input{mile/tables/harness_results}
+
+\Needspace{4\baselineskip}
+With \harness{}, all eight scores match or exceed the base. Opus 4.8 matches it on MMAR, VideoMME-v2, and OmniVideoBench; both research models exceed it on MMMU-Pro. These results show that \harness{} improves submission quality through both recovery from degradation and gains beyond the base.
+
+
+\subsection{Ablation Studies}
+\label{sec:ablation}
+
+\noindent\begin{minipage}[t]{0.60\linewidth}
+\vspace{0pt}
+\noindent\textbf{Development Feedback Budget.}\quad
+To examine how development feedback affects autonomous research, we evaluate Claude Opus 4.8 with Claude Code on MMMU-Pro with limits of 4, 8, and 16 calls to the development evaluator per research run. Each call returns feedback to guide subsequent research. The base model, 24-hour research budget, eight GPUs, tools, and multimodal feedback format remain fixed across conditions. Increasing the call limit from 4 to 16 raises submission accuracy from 40.56\% to 42.09\%, with smaller incremental gains at the higher budget (Figure~\ref{fig:feedback-budget}).
+\end{minipage}\hfill
+\begin{minipage}[t]{0.37\linewidth}
+\vspace{0pt}
+\centering
+\includegraphics[width=\linewidth]{mile/figures/feedback_budget_single.pdf}\par
+\setlength{\abovecaptionskip}{3pt}
+\setlength{\belowcaptionskip}{0pt}
+\captionof{figure}{\textbf{Development feedback budget on MMMU-Pro.}}
+\label{fig:feedback-budget}
+\end{minipage}\par
+
+\medskip
+\noindent\begin{minipage}[t]{0.60\linewidth}
+\vspace{0pt}
+\noindent\textbf{MMResearch Components.}\quad
+Using the same model--harness pair and benchmark, we assess the contributions of hierarchical memory and multimodal evidence within MMResearch. \emph{w/o Hierarchical Memory} removes structured storage and retrieval across rounds; \emph{w/o Multimodal Evidence} removes evidence organization and media-grounded diagnosis. Native context, raw media access, and candidate-selection rules remain unchanged. Removing hierarchical memory or multimodal evidence lowers accuracy from 43.74\% to 42.10\% and 42.83\%, respectively (Table~\ref{tab:milestone-components}). The drops of 1.64 and 0.91 pp support both components' contribution to final submission quality in this setting.
+\end{minipage}\hfill
+\begin{minipage}[t]{0.37\linewidth}
+\vspace{0pt}
+\centering
+\setlength{\abovecaptionskip}{0pt}
+\setlength{\belowcaptionskip}{3pt}
+\captionof{table}{\textbf{MMResearch component ablations on MMMU-Pro.} Gain is the accuracy change from the base (pp).}
+\label{tab:milestone-components}
+\fontsize{9}{10.4}\selectfont
+\setlength{\tabcolsep}{4pt}
+\setlength{\extrarowheight}{1pt}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}Xr@{}}
+\toprule
+\textbf{Variant} & \textbf{Gain} $\uparrow$\\
+\midrule
+\rowcolor{black!4}\textbf{Full} & +1.83\\
+w/o Hierarchical Memory & +0.19\\
+w/o Multimodal Evidence & +0.92\\
+\bottomrule
+\end{tabularx}
+\end{minipage}\par

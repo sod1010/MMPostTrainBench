@@ -2,6 +2,8 @@
 
 **MMPostTrainBench: Benchmarking Autonomous Research for Multimodal Post-Training**
 
+[Paper source](paper/) · [Download arXiv source ZIP](paper/MMPostTrainBench_arxiv_source_20261003.zip)
+
 论文中的基准统一称为 **MMPostTrainBench**，多模态研究框架称为 **MMResearch**。本仓库提供 benchmark 评测代码；任务 ID、目录名及命令中的 `mmposttrainbench` / `mmptb` 前缀保留，以兼容现有配置。
 
 **CLI 智能体能否对多模态大模型做后训练?** MMPostTrainBench 衡量编码智能体(Claude Code、Codex,或让 omni 模型驱动自己)能否**后训练 Qwen3-Omni-30B-A3B**、提升它在某个多模态基准上的分数。智能体拿到基座模型、评测脚本和 GPU 预算,交付一个微调后的 `final_model`,在**密封的留出集**上打分。这考察的是智能体做真实多模态 AI 研发的能力(数据获取、训练方法、迭代),而不只是写代码。
